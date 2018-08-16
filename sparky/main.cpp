@@ -23,12 +23,6 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-// ROADMAP
-// 1. Decide on and implement render pass abstraction
-// 2. Automatic scheduling for 2+ in flight frames
-// 3. sp_compute_command_list
-// 4. Fix shutdown leaks
-
 #define GRAPHICS_OBJECT_DEBUG_NAMING_ENABLED 1 
 
 const int k_back_buffer_count = 2;
