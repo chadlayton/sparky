@@ -379,6 +379,7 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 	UINT compile_flags = 0;
 #endif
 
+	ID3DBlob* error_blob = nullptr;
 	HRESULT hr = D3DCompileFromFile(
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(), 
 		nullptr, 
@@ -386,9 +387,16 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 		"VSMain", 
 		"vs_5_0", 
 		compile_flags, 
-		0, 
+		0,
 		&shader._blob,
-		nullptr);
+		&error_blob);
+
+	if (error_blob)
+	{
+		OutputDebugStringA(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+		error_blob->Release();
+	}
+
 	assert(SUCCEEDED(hr));
 
 	return shader_handle;
@@ -405,6 +413,7 @@ sp_pixel_shader_handle sp_create_pixel_shader(const sp_pixel_shader_desc& desc)
 	UINT compile_flags = 0;
 #endif
 
+	ID3DBlob* error_blob = nullptr;
 	HRESULT hr = D3DCompileFromFile(
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(), 
 		nullptr, 
@@ -414,7 +423,14 @@ sp_pixel_shader_handle sp_create_pixel_shader(const sp_pixel_shader_desc& desc)
 		compile_flags, 
 		0, 
 		&shader._blob, 
-		nullptr);
+		&error_blob);
+
+	if (error_blob)
+	{
+		OutputDebugStringA(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+		error_blob->Release();
+	}
+
 	assert(SUCCEEDED(hr));
 
 	return shader_handle;
@@ -800,6 +816,7 @@ int main()
 			pixel_shader_handle, 
 			{ 
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
 				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT } 
 			}
@@ -826,15 +843,16 @@ int main()
 		struct vertex
 		{
 			DirectX::XMFLOAT3 position;
+			DirectX::XMFLOAT3 normal;
 			DirectX::XMFLOAT2 texcoord;
 			DirectX::XMFLOAT4 color;
 		};
 
 		vertex triangle_vertices[] =
 		{
-			{ { 0.0f, 0.25f * aspect_ratio, 0.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.25f, -0.25f * aspect_ratio, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.25f, -0.25f * aspect_ratio, 0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+			{ { 0.0f, 0.25f * aspect_ratio, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.25f, -0.25f * aspect_ratio, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.25f, -0.25f * aspect_ratio, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
 		};
 
 		vertex_buffer_handle = sp_vertex_buffer_create("triangle", { sizeof(triangle_vertices) });
