@@ -289,11 +289,11 @@ void sp_init(const sp_window& window)
 	_sp._root_signature = root_signature;
 
 
-	sp_handle_pool_init(&_sp.vertex_shader_handles, _sp.vertex_shaders.size());
-	sp_handle_pool_init(&_sp.pixel_shader_handles, _sp.pixel_shaders.size());
-	sp_handle_pool_init(&_sp.texture_handles, _sp.textures.size());
-	sp_handle_pool_init(&_sp.vertex_buffer_handles, _sp.vertex_buffers.size());
-	sp_handle_pool_init(&_sp.graphics_pipeline_handles, _sp.graphics_pipelines.size());
+	sp_handle_pool_init(&_sp.vertex_shader_handles, static_cast<int>(_sp.vertex_shaders.size()));
+	sp_handle_pool_init(&_sp.pixel_shader_handles, static_cast<int>(_sp.pixel_shaders.size()));
+	sp_handle_pool_init(&_sp.texture_handles, static_cast<int>(_sp.textures.size()));
+	sp_handle_pool_init(&_sp.vertex_buffer_handles, static_cast<int>(_sp.vertex_buffers.size()));
+	sp_handle_pool_init(&_sp.graphics_pipeline_handles, static_cast<int>(_sp.graphics_pipelines.size()));
 }
 
 void sp_shutdown()
@@ -385,9 +385,16 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 	UINT compile_flags = 0;
 #endif
 
-	wchar_t w_file_path[256];
-	mbstowcs(w_file_path, desc._file_path, 256 - 1);
-	HRESULT hr = D3DCompileFromFile(w_file_path, nullptr, nullptr, "VSMain", "vs_5_0", compile_flags, 0, &shader._blob, nullptr);
+	HRESULT hr = D3DCompileFromFile(
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(), 
+		nullptr, 
+		nullptr, 
+		"VSMain", 
+		"vs_5_0", 
+		compile_flags, 
+		0, 
+		&shader._blob,
+		nullptr);
 	assert(SUCCEEDED(hr));
 
 	return shader_handle;
@@ -404,9 +411,16 @@ sp_pixel_shader_handle sp_create_pixel_shader(const sp_pixel_shader_desc& desc)
 	UINT compile_flags = 0;
 #endif
 
-	wchar_t w_file_path[256];
-	mbstowcs(w_file_path, desc._file_path, 256 - 1);
-	HRESULT hr = D3DCompileFromFile(w_file_path, nullptr, nullptr, "PSMain", "ps_5_0", compile_flags, 0, &shader._blob, nullptr);
+	HRESULT hr = D3DCompileFromFile(
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(), 
+		nullptr, 
+		nullptr, 
+		"PSMain", 
+		"ps_5_0", 
+		compile_flags, 
+		0, 
+		&shader._blob, 
+		nullptr);
 	assert(SUCCEEDED(hr));
 
 	return shader_handle;
@@ -603,14 +617,6 @@ void sp_device_wait_for_idle()
 {
 	sp_graphics_queue_wait_for_idle();
 	// sp_compute_queue_wait_for_idle();
-}
-
-inline void ThrowIfFailed(HRESULT hr)
-{
-	if (FAILED(hr))
-	{
-		throw std::exception();
-	}
 }
 
 struct sp_texture_desc
