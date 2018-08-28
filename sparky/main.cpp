@@ -303,7 +303,7 @@ sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_verte
 	HRESULT hr = S_OK;
 
 	sp_vertex_buffer_handle buffer_handle = sp_handle_alloc(&_sp.vertex_buffer_handles);
-	sp_vertex_buffer& buffer = _sp.vertex_buffers[buffer_handle];
+	sp_vertex_buffer& buffer = _sp.vertex_buffers[buffer_handle.index];
 
 	// Note: using upload heaps to transfer static data is not 
 	// recommended. Every time the GPU needs it, the upload heap will be marshalled 
@@ -329,14 +329,14 @@ sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_verte
 
 ID3D12Resource* sp_vertex_buffer_get_impl(const sp_vertex_buffer_handle& buffer_handle)
 {
-	return _sp.vertex_buffers[buffer_handle]._resource.Get();
+	return _sp.vertex_buffers[buffer_handle.index]._resource.Get();
 }
 
 void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, void* data_cpu, size_t size_bytes)
 {
 	HRESULT hr = S_OK;
 
-	sp_vertex_buffer& buffer = _sp.vertex_buffers[buffer_handle];
+	sp_vertex_buffer& buffer = _sp.vertex_buffers[buffer_handle.index];
 
 	void* data_gpu;
 	// A range where end <= begin indicates we do not intend to read from this resource on the CPU.
@@ -349,7 +349,7 @@ void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, void*
 
 void sp_vertex_buffer_destroy(const sp_vertex_buffer_handle& buffer_handle)
 {
-	sp_vertex_buffer& buffer = _sp.vertex_buffers[buffer_handle];
+	sp_vertex_buffer& buffer = _sp.vertex_buffers[buffer_handle.index];
 
 	buffer._resource = nullptr;
 
@@ -369,7 +369,7 @@ struct sp_pixel_shader_desc
 sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& desc)
 {
 	sp_vertex_shader_handle shader_handle = sp_handle_alloc(&_sp.vertex_shader_handles);
-	sp_vertex_shader& shader = _sp.vertex_shaders[shader_handle];
+	sp_vertex_shader& shader = _sp.vertex_shaders[shader_handle.index];
 
 #if defined(_DEBUG)
 	UINT compile_flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
@@ -403,7 +403,7 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 {
 	sp_pixel_shader_handle shader_handle = sp_handle_alloc(&_sp.pixel_shader_handles);
-	sp_pixel_shader& shader = _sp.pixel_shaders[shader_handle];
+	sp_pixel_shader& shader = _sp.pixel_shaders[shader_handle.index];
 
 #if defined(_DEBUG)
 	UINT compile_flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -436,12 +436,12 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 
 ID3DBlob* sp_vertex_shader_get_impl(const sp_vertex_shader_handle& shader_handle)
 {
-	return _sp.vertex_shaders[shader_handle]._blob.Get();
+	return _sp.vertex_shaders[shader_handle.index]._blob.Get();
 }
 
 ID3DBlob* sp_pixel_shader_get_impl(const sp_pixel_shader_handle& shader_handle)
 {
-	return _sp.pixel_shaders[shader_handle]._blob.Get();
+	return _sp.pixel_shaders[shader_handle.index]._blob.Get();
 }
 
 struct sp_input_element_desc
@@ -461,7 +461,7 @@ struct sp_graphics_pipeline_desc
 sp_graphics_pipeline_handle sp_graphics_pipeline_create(const char* name, const sp_graphics_pipeline_desc& desc)
 {
 	sp_graphics_pipeline_handle pipeline_handle = sp_handle_alloc(&_sp.graphics_pipeline_handles);
-	sp_graphics_pipeline& pipeline = _sp.graphics_pipelines[pipeline_handle];
+	sp_graphics_pipeline& pipeline = _sp.graphics_pipelines[pipeline_handle.index];
 
 	pipeline._name = name;
 
@@ -509,7 +509,7 @@ sp_graphics_pipeline_handle sp_graphics_pipeline_create(const char* name, const 
 
 ID3D12PipelineState* sp_graphics_pipeline_get_impl(const sp_graphics_pipeline_handle& pipeline_handle)
 {
-	return _sp.graphics_pipelines[pipeline_handle]._impl.Get();
+	return _sp.graphics_pipelines[pipeline_handle.index]._impl.Get();
 }
 
 struct sp_graphics_command_list_desc
@@ -537,11 +537,17 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 	command_list._command_allocator_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
 #endif
 
+	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
+	if (desc.pipeline_handle)
+	{
+		pipeline_state_d3d12 = sp_graphics_pipeline_get_impl(desc.pipeline_handle);
+	}
+
 	hr = _sp._device->CreateCommandList(
-		0, 
-		D3D12_COMMAND_LIST_TYPE_DIRECT, 
-		command_list._command_allocator_d3d12.Get(), 
-		sp_graphics_pipeline_get_impl(desc.pipeline_handle),
+		0,
+		D3D12_COMMAND_LIST_TYPE_DIRECT,
+		command_list._command_allocator_d3d12.Get(),
+		pipeline_state_d3d12,
 		IID_PPV_ARGS(&command_list._command_list_d3d12));
 	assert(SUCCEEDED(hr));
 
@@ -550,10 +556,6 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 #endif
 
 	command_list._name = name;
-
-	// TODO: Starting out closed just to force a call to reset later so a pipeline can be 
-	// supplied (or not - explicitly). Right now the interface doesn't allow optional handles.
-	command_list._command_list_d3d12->Close();
 
 	return command_list;
 }
@@ -683,7 +685,7 @@ std::vector<uint8_t> sp_image_create_checkerboard_data(int width, int height)
 sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& desc)
 {
 	sp_texture_handle texture_handle = sp_handle_alloc(&_sp.texture_handles);
-	sp_texture& texture = _sp.textures[texture_handle];
+	sp_texture& texture = _sp.textures[texture_handle.index];
 
 	D3D12_RESOURCE_DESC resource_desc_d3d12 = {};
 	resource_desc_d3d12.MipLevels = 1;
@@ -730,10 +732,9 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 
 void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, size_t size_bytes)
 {
-	sp_texture& texture = _sp.textures[texture_handle];
+	sp_texture& texture = _sp.textures[texture_handle.index];
 
 	sp_graphics_command_list texture_update_command_list = sp_graphics_command_list_create(texture._name, {});
-	sp_graphics_command_list_reset(texture_update_command_list);
 
 	// TODO: Buffer size
 	// Create the GPU upload buffer.
@@ -823,7 +824,7 @@ int main()
 		sp_vertex_shader_handle vertex_shader_handle = sp_vertex_shader_create({ "shaders.hlsl" });
 		sp_pixel_shader_handle pixel_shader_handle = sp_pixel_shader_create({ "shaders.hlsl" });
 
-		pipeline_handle = sp_graphics_pipeline_create("mypipeline", {
+		pipeline_handle = sp_graphics_pipeline_create("pipeline", {
 			vertex_shader_handle, 
 			pixel_shader_handle, 
 			{ 
@@ -835,7 +836,7 @@ int main()
 		});
 	}
 
-	command_list = sp_graphics_command_list_create("main", {});
+	command_list = sp_graphics_command_list_create("main", { pipeline_handle });
 
 	// create textures
 	{
@@ -877,8 +878,6 @@ int main()
 	{
 		// Record all the commands we need to render the scene into the command list.
 		{
-			sp_graphics_command_list_reset(command_list, pipeline_handle);
-
 			// Set necessary state.
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootSignature(_sp._root_signature.Get());
 			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._shader_resource_view_descriptor_heap.Get() };
@@ -914,6 +913,8 @@ int main()
 		sp_swap_chain_present();
 
 		sp_device_wait_for_idle();
+
+		sp_graphics_command_list_reset(command_list, pipeline_handle);
 
 		frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	}
