@@ -5,19 +5,20 @@
 #include <string>
 #include <cassert>
 #include <codecvt>
+#include <array>
+#include <vector>
 
 #include <d3d12.h>
 #include <dxgi1_3.h>
 #include <dxgi1_4.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
-#include "d3dx12.h"
 
+#include <fx/gltf.h>
+
+#include "d3dx12.h"
 #include "window.h"
 #include "handle.h"
-
-#include <array>
-#include <vector>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -62,7 +63,7 @@ struct sp
 	Microsoft::WRL::ComPtr<ID3D12Device> _device;
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
 
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_command_queue;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> _back_buffers[k_back_buffer_count];
 
@@ -146,13 +147,13 @@ void sp_init(const sp_window& window)
 	hr = D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
 	assert(SUCCEEDED(hr));
 
-	// Describe and create the command queue.
-	D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
-	command_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	command_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	// Describe and create the command queue for graphics command lists
+	D3D12_COMMAND_QUEUE_DESC graphics_queue_desc = {};
+	graphics_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	graphics_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> command_queue;
-	hr = device->CreateCommandQueue(&command_queue_desc, IID_PPV_ARGS(&command_queue));
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> graphics_queue;
+	hr = device->CreateCommandQueue(&graphics_queue_desc, IID_PPV_ARGS(&graphics_queue));
 	assert(SUCCEEDED(hr));
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain;
@@ -171,7 +172,7 @@ void sp_init(const sp_window& window)
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain1;
 		hr = dxgi_factory->CreateSwapChainForHwnd(
-			command_queue.Get(),		// Swap chain needs the queue so that it can force a flush on it.
+			graphics_queue.Get(),		// Swap chain needs the queue so that it can force a flush on it.
 			(HWND)window._handle,
 			&swap_chain_desc,
 			nullptr,
@@ -270,7 +271,7 @@ void sp_init(const sp_window& window)
 
 	_sp._device = device;
 	_sp._swap_chain = swap_chain;
-	_sp._graphics_command_queue = command_queue;
+	_sp._graphics_queue = graphics_queue;
 	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; back_buffer_index++)
 	{
 		_sp._back_buffers[back_buffer_index] = back_buffers[back_buffer_index];
@@ -402,7 +403,7 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 	return shader_handle;
 }
 
-sp_pixel_shader_handle sp_create_pixel_shader(const sp_pixel_shader_desc& desc)
+sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 {
 	sp_pixel_shader_handle shader_handle = sp_handle_alloc(&_sp.pixel_shader_handles);
 	sp_pixel_shader& shader = _sp.pixel_shaders[shader_handle];
@@ -516,8 +517,7 @@ ID3D12PipelineState* sp_graphics_pipeline_get_impl(const sp_graphics_pipeline_ha
 
 struct sp_graphics_command_list_desc
 {
-	// TODO: Initial State (Optional)
-	// sp_graphics_pipeline_handle pipeline_handle;
+	sp_graphics_pipeline_handle pipeline_handle;
 };
 
 struct sp_graphics_command_list
@@ -536,11 +536,15 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 		IID_PPV_ARGS(&command_list._command_allocator_d3d12));
 	assert(SUCCEEDED(hr));
 
+#if GRAPHICS_OBJECT_DEBUG_NAMING_ENABLED
+	command_list._command_allocator_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+#endif
+
 	hr = _sp._device->CreateCommandList(
 		0, 
 		D3D12_COMMAND_LIST_TYPE_DIRECT, 
 		command_list._command_allocator_d3d12.Get(), 
-		nullptr,
+		sp_graphics_pipeline_get_impl(desc.pipeline_handle),
 		IID_PPV_ARGS(&command_list._command_list_d3d12));
 	assert(SUCCEEDED(hr));
 
@@ -551,8 +555,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 	command_list._name = name;
 
 	// TODO: Starting out closed just to force a call to reset later so a pipeline can be 
-	// supplied (or not - explicitly). The only reason that makes any sense at all is how
-	// a single command list is being used for resource updates and the graphics commands.
+	// supplied (or not - explicitly). Right now the interface doesn't allow optional handles.
 	command_list._command_list_d3d12->Close();
 
 	return command_list;
@@ -580,6 +583,13 @@ void sp_graphics_command_list_reset(sp_graphics_command_list& command_list, cons
 	assert(SUCCEEDED(hr));
 }
 
+void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list)
+{
+	command_list._name = nullptr;
+	command_list._command_list_d3d12.Reset();
+	command_list._command_allocator_d3d12.Reset();
+}
+
 ID3D12GraphicsCommandList* sp_graphics_command_list_get_impl(const sp_graphics_command_list& command_list)
 {
 	return command_list._command_list_d3d12.Get();
@@ -588,7 +598,7 @@ ID3D12GraphicsCommandList* sp_graphics_command_list_get_impl(const sp_graphics_c
 void sp_graphics_queue_execute(sp_graphics_command_list command_list)
 {
 	ID3D12CommandList* command_lists_d3d12[] = { sp_graphics_command_list_get_impl(command_list) };
-	_sp._graphics_command_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
+	_sp._graphics_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
 }
 
 void sp_graphics_queue_wait_for_idle()
@@ -606,7 +616,7 @@ void sp_graphics_queue_wait_for_idle()
 
 	// Signal and increment the fence value.
 	const UINT64 fence_value = next_fence_value;
-	hr = _sp._graphics_command_queue->Signal(fence.Get(), fence_value);
+	hr = _sp._graphics_queue->Signal(fence.Get(), fence_value);
 	assert(SUCCEEDED(hr));
 	next_fence_value++;
 
@@ -721,9 +731,12 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	return texture_handle;
 }
 
-void sp_texture_update(sp_graphics_command_list& command_list, const sp_texture_handle& texture_handle, void* data_cpu, size_t size_bytes)
+void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, size_t size_bytes)
 {
 	sp_texture& texture = _sp.textures[texture_handle];
+
+	sp_graphics_command_list texture_update_command_list = sp_graphics_command_list_create(texture._name, {});
+	sp_graphics_command_list_reset(texture_update_command_list);
 
 	// TODO: Buffer size
 	// Create the GPU upload buffer.
@@ -753,7 +766,7 @@ void sp_texture_update(sp_graphics_command_list& command_list, const sp_texture_
 	subresource_data.RowPitch = texture._width * g_pixel_size_bytes;
 	subresource_data.SlicePitch = subresource_data.RowPitch * texture._height;
 
-	UpdateSubresources(command_list._command_list_d3d12.Get(),
+	UpdateSubresources(texture_update_command_list._command_list_d3d12.Get(),
 		texture._impl.Get(),
 		texture_upload_buffer.Get(),
 		0,
@@ -761,12 +774,14 @@ void sp_texture_update(sp_graphics_command_list& command_list, const sp_texture_
 		1,
 		&subresource_data);
 
-	sp_graphics_command_list_get_impl(command_list)->Close();
+	sp_graphics_command_list_get_impl(texture_update_command_list)->Close();
 
-	sp_graphics_queue_execute(command_list);
+	sp_graphics_queue_execute(texture_update_command_list);
 
 	// Need to wait for texture to be updated before allowing upload buffer to fall out of scope
 	sp_graphics_queue_wait_for_idle();
+
+	sp_graphics_command_list_destroy(texture_update_command_list);
 }
 
 void sp_swap_chain_present()
@@ -809,7 +824,7 @@ int main()
 	// Create the pipeline state, which includes compiling and loading shaders.
 	{
 		sp_vertex_shader_handle vertex_shader_handle = sp_vertex_shader_create({ "shaders.hlsl" });
-		sp_pixel_shader_handle pixel_shader_handle = sp_create_pixel_shader({ "shaders.hlsl" });
+		sp_pixel_shader_handle pixel_shader_handle = sp_pixel_shader_create({ "shaders.hlsl" });
 
 		pipeline_handle = sp_graphics_pipeline_create("mypipeline", {
 			vertex_shader_handle, 
@@ -828,14 +843,10 @@ int main()
 	// create textures
 	{
 		texture0_handle = sp_texture_create("mytexture0", { 1024, 1024 });
+		sp_texture_update(texture0_handle, nullptr, 0);
+
 		texture1_handle = sp_texture_create("mytexture1", { 512, 512 });
-
-		// TODO: The call to update executes the command list. Needs to be reset after each call.
-		sp_graphics_command_list_reset(command_list);
-		sp_texture_update(command_list, texture0_handle, nullptr, 0);
-
-		sp_graphics_command_list_reset(command_list);
-		sp_texture_update(command_list, texture1_handle, nullptr, 0);
+		sp_texture_update(texture1_handle, nullptr, 0);
 	}
 
 	// create the vertex buffer.
