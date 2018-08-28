@@ -13,9 +13,6 @@
 #include <dxgi1_4.h>
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
-
-#include <fx/gltf.h>
-
 #include "d3dx12.h"
 #include "window.h"
 #include "handle.h"
