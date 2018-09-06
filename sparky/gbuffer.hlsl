@@ -1,5 +1,7 @@
-Texture2D g_texture : register(t0);
-SamplerState g_sampler : register(s0);
+Texture2D base_color_texture : register(t0);
+Texture2D normal_map_texture : register(t1);
+
+SamplerState default_sampler : register(s0);
 
 struct vs_input
 {
@@ -18,7 +20,7 @@ struct vs_output
 	float4 color : COLOR;
 };
 
-vs_output VSMain(vs_input input)
+vs_output vs_main(vs_input input)
 {
 	vs_output output;
 
@@ -47,13 +49,13 @@ struct ps_output
 	float4 normal_ws : SV_Target2;
 };
 
-ps_output PSMain(ps_input input)
+ps_output ps_main(ps_input input)
 {
 	ps_output output;
 
-	output.base_color = g_texture.Sample(g_sampler, input.texcoord) * input.color;
+	output.base_color = base_color_texture.Sample(default_sampler, input.texcoord) * input.color;
 	output.position_ws = input.position_ws;
-	output.normal_ws = input.normal_ws;
-	
+	output.normal_ws = input.normal_ws * normal_map_texture.Sample(default_sampler, input.texcoord);
+
 	return output;
 }
