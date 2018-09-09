@@ -1,6 +1,6 @@
-Texture2D base_color_texture : register(t2);
-Texture2D normal_map_texture : register(t3);
-Texture2D position_texture : register(t4);
+Texture2D base_color_texture : register(t1);
+Texture2D normal_map_texture : register(t2);
+Texture2D position_texture : register(t3);
 
 SamplerState default_sampler : register(s0);
 
@@ -38,24 +38,32 @@ vs_output vs_main(vs_input input)
 	return output;
 }
 
+struct point_light
+{
+	float3 position_ws;
+	float intensity;      // radiant intensity (power per unit steradian)
+};
+
 struct ps_input
 {
 	float4 position_ss : SV_Position;
 	float2 texcoord : TEXCOORD;
 };
 
-struct ps_output
-{
-	float4 base_color : SV_Target0;
-	float4 position_ws : SV_Target1;
-	float4 normal_ws : SV_Target2;
-};
-
 float4 ps_main(ps_input input) : SV_Target0
 {
+	point_light light;
+	light.position_ws = float3(0.0f, 0.0f, 1.0f);
+	light.intensity = 10;
+
 	float3 base_color = base_color_texture.Sample(default_sampler, input.texcoord).xyz;
 	float3 normal_ws = normal_map_texture.Sample(default_sampler, input.texcoord).xyz;
 	float3 position_ws = position_texture.Sample(default_sampler, input.texcoord).xyz;
 
-	return float4(base_color, 1.0f);
+	float3 direction_to_light = normalize(light.position_ws - position_ws);
+	float n_dot_l = dot(normal_ws, direction_to_light);
+	float3 color = base_color * n_dot_l;
+
+	//return float4(normal_ws, 1.0f);
+	return float4(color, 1.0f);
 }

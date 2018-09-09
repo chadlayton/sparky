@@ -37,7 +37,7 @@ struct sp_pixel_shader
 	Microsoft::WRL::ComPtr<ID3DBlob> _blob;
 };
 
-struct sp_graphics_pipeline
+struct sp_graphics_pipeline_state
 {
 	const char* _name;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
@@ -92,14 +92,14 @@ struct sp
 	std::array<sp_vertex_buffer, 1024> vertex_buffers;
 	sp_handle_pool vertex_buffer_handles;
 
-	std::array<sp_graphics_pipeline, 1024> graphics_pipelines;
+	std::array<sp_graphics_pipeline_state, 1024> graphics_pipelines;
 	sp_handle_pool graphics_pipeline_handles;
 
 } _sp;
 
 using sp_vertex_shader_handle = sp_handle;
 using sp_pixel_shader_handle = sp_handle;
-using sp_graphics_pipeline_handle = sp_handle;
+using sp_graphics_pipeline_state_handle = sp_handle;
 using sp_vertex_buffer_handle = sp_handle;
 using sp_texture_handle = sp_handle;
 
@@ -226,7 +226,19 @@ void sp_init(const sp_window& window)
 		shader_resource_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
-	// Create an empty root signature.
+	/*
+	Root Signature defines the number of arguments and their types :
+		Constants
+		Descriptors
+		Descriptor Tables
+	Performance improves with fewer DWORDs used
+		Keep argument list short
+	Try not to change this signature too often
+		A few times per frame
+
+	Analog of function signature and function call arguments
+	The main( int argc, char *argv[] ) {}; for your GPU code
+	*/
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
 	{
 		// TODO: Hardcoded
@@ -454,7 +466,7 @@ struct sp_input_element_desc
 	DXGI_FORMAT _format;
 };
 
-struct sp_graphics_pipeline_desc
+struct sp_graphics_pipeline_state_desc
 {
 	sp_vertex_shader_handle _vertex_shader_handle;
 	sp_pixel_shader_handle _pixel_shader_handle;
@@ -462,12 +474,12 @@ struct sp_graphics_pipeline_desc
 	DXGI_FORMAT _render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
 };
 
-sp_graphics_pipeline_handle sp_graphics_pipeline_create(const char* name, const sp_graphics_pipeline_desc& desc)
+sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* name, const sp_graphics_pipeline_state_desc& desc)
 {
-	sp_graphics_pipeline_handle pipeline_handle = sp_handle_alloc(&_sp.graphics_pipeline_handles);
-	sp_graphics_pipeline& pipeline = _sp.graphics_pipelines[pipeline_handle.index];
+	sp_graphics_pipeline_state_handle pipeline_state_handle = sp_handle_alloc(&_sp.graphics_pipeline_handles);
+	sp_graphics_pipeline_state& pipeline_state = _sp.graphics_pipelines[pipeline_state_handle.index];
 
-	pipeline._name = name;
+	pipeline_state._name = name;
 
 	// TODO: Deduce from vertex shader reflection data?
 	D3D12_INPUT_ELEMENT_DESC input_element_desc[D3D12_STANDARD_VERTEX_ELEMENT_COUNT];
@@ -486,17 +498,17 @@ sp_graphics_pipeline_handle sp_graphics_pipeline_create(const char* name, const 
 		input_element_desc[input_element_count].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	}
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_desc = {};
-	pipeline_desc.InputLayout = { input_element_desc, input_element_count };
-	pipeline_desc.pRootSignature = _sp._root_signature.Get();
-	pipeline_desc.VS = CD3DX12_SHADER_BYTECODE(sp_vertex_shader_get_impl(desc._vertex_shader_handle));
-	pipeline_desc.PS = CD3DX12_SHADER_BYTECODE(sp_pixel_shader_get_impl(desc._pixel_shader_handle));
-	pipeline_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	pipeline_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	pipeline_desc.DepthStencilState.DepthEnable = FALSE;
-	pipeline_desc.DepthStencilState.StencilEnable = FALSE;
-	pipeline_desc.SampleMask = UINT_MAX;
-	pipeline_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
+	pipeline_state_desc.InputLayout = { input_element_desc, input_element_count };
+	pipeline_state_desc.pRootSignature = _sp._root_signature.Get();
+	pipeline_state_desc.VS = CD3DX12_SHADER_BYTECODE(sp_vertex_shader_get_impl(desc._vertex_shader_handle));
+	pipeline_state_desc.PS = CD3DX12_SHADER_BYTECODE(sp_pixel_shader_get_impl(desc._pixel_shader_handle));
+	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+	pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
+	pipeline_state_desc.SampleMask = UINT_MAX;
+	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	//pipeline_desc.NumRenderTargets = 1;
 	//pipeline_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	unsigned render_target_count = 0;
@@ -507,29 +519,29 @@ sp_graphics_pipeline_handle sp_graphics_pipeline_create(const char* name, const 
 			break;
 		}
 
-		pipeline_desc.RTVFormats[render_target_count] = desc._render_target_formats[render_target_count];
+		pipeline_state_desc.RTVFormats[render_target_count] = desc._render_target_formats[render_target_count];
 	}
-	pipeline_desc.NumRenderTargets = render_target_count;
-	pipeline_desc.SampleDesc.Count = 1;
+	pipeline_state_desc.NumRenderTargets = render_target_count;
+	pipeline_state_desc.SampleDesc.Count = 1;
 
-	HRESULT hr = _sp._device->CreateGraphicsPipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline._impl));
+	HRESULT hr = _sp._device->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&pipeline_state._impl));
 	assert(SUCCEEDED(hr));
 
 #if GRAPHICS_OBJECT_DEBUG_NAMING_ENABLED
-	pipeline._impl->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+	pipeline_state._impl->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
 #endif
 
-	return pipeline_handle;
+	return pipeline_state_handle;
 }
 
-ID3D12PipelineState* sp_graphics_pipeline_get_impl(const sp_graphics_pipeline_handle& pipeline_handle)
+ID3D12PipelineState* sp_graphics_pipeline_state_get_impl(const sp_graphics_pipeline_state_handle& pipeline_handle)
 {
 	return _sp.graphics_pipelines[pipeline_handle.index]._impl.Get();
 }
 
 struct sp_graphics_command_list_desc
 {
-	sp_graphics_pipeline_handle pipeline_handle;
+	sp_graphics_pipeline_state_handle pipeline_state_handle;
 };
 
 struct sp_graphics_command_list
@@ -553,9 +565,9 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 #endif
 
 	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
-	if (desc.pipeline_handle)
+	if (desc.pipeline_state_handle)
 	{
-		pipeline_state_d3d12 = sp_graphics_pipeline_get_impl(desc.pipeline_handle);
+		pipeline_state_d3d12 = sp_graphics_pipeline_state_get_impl(desc.pipeline_state_handle);
 	}
 
 	hr = _sp._device->CreateCommandList(
@@ -586,14 +598,14 @@ void sp_graphics_command_list_reset(sp_graphics_command_list& command_list)
 	assert(SUCCEEDED(hr));
 }
 
-void sp_graphics_command_list_reset(sp_graphics_command_list& command_list, const sp_graphics_pipeline_handle& pipeline_handle)
+void sp_graphics_command_list_reset(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle)
 {
 	HRESULT hr = command_list._command_allocator_d3d12->Reset();
 	assert(SUCCEEDED(hr));
 
 	hr = command_list._command_list_d3d12->Reset(
 		command_list._command_allocator_d3d12.Get(), 
-		sp_graphics_pipeline_get_impl(pipeline_handle));
+		sp_graphics_pipeline_state_get_impl(pipeline_state_handle));
 	assert(SUCCEEDED(hr));
 }
 
@@ -902,7 +914,7 @@ int main()
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "gbuffer.hlsl" });
 
-	sp_graphics_pipeline_handle gbuffer_pipeline_handle = sp_graphics_pipeline_create("gbuffer", {
+	sp_graphics_pipeline_state_handle gbuffer_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer", {
 		gbuffer_vertex_shader_handle, 
 		gbuffer_pixel_shader_handle, 
 		{ 
@@ -921,7 +933,7 @@ int main()
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "lighting.hlsl" });
 
-	sp_graphics_pipeline_handle lighting_pipeline_handle = sp_graphics_pipeline_create("lighting", {
+	sp_graphics_pipeline_state_handle lighting_pipeline_state_handle = sp_graphics_pipeline_state_create("lighting", {
 		lighting_vertex_shader_handle,
 		lighting_pixel_shader_handle,
 		{},
@@ -930,13 +942,13 @@ int main()
 		},
 	});
 
-	sp_graphics_command_list command_list = sp_graphics_command_list_create("main", { gbuffer_pipeline_handle });
+	sp_graphics_command_list command_list = sp_graphics_command_list_create("main", { gbuffer_pipeline_state_handle });
 
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024 });
 	sp_texture_update(checkerboard_big_texture_handle, nullptr, 0);
 
-	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128 });
-	sp_texture_update(checkerboard_small_texture_handle, nullptr, 0);
+	//sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128 });
+	//sp_texture_update(checkerboard_small_texture_handle, nullptr, 0);
 
 	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height });
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height });
@@ -988,12 +1000,12 @@ int main()
 
 			// Checkerboard texture used as shader resource
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+			//sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 			D3D12_CPU_DESCRIPTOR_HANDLE gbuffer_render_target_views[] = {
 				sp_texture_get_hack(gbuffer_base_color_texture_handle)._render_target_view,
-				sp_texture_get_hack(gbuffer_position_texture_handle)._render_target_view,
 				sp_texture_get_hack(gbuffer_normals_texture_handle)._render_target_view,
+				sp_texture_get_hack(gbuffer_position_texture_handle)._render_target_view,
 			};
 			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(gbuffer_render_target_views)), gbuffer_render_target_views, false, nullptr);
 
@@ -1001,7 +1013,7 @@ int main()
 			sp_graphics_command_list_set_vertex_buffers(command_list, &triangle_vertex_buffer_handle, 1);
 			sp_graphics_command_list_get_impl(command_list)->DrawInstanced(3, 1, 0, 0);
 
-			sp_graphics_command_list_get_impl(command_list)->SetPipelineState(sp_graphics_pipeline_get_impl(lighting_pipeline_handle));
+			sp_graphics_command_list_get_impl(command_list)->SetPipelineState(sp_graphics_pipeline_state_get_impl(lighting_pipeline_state_handle));
 
 			// Indicate that the gbuffer textures will be used as pixel shader resources
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
@@ -1032,7 +1044,7 @@ int main()
 
 			// Restore checkerboard texture to default
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
+			//sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
 
 			HRESULT hr = sp_graphics_command_list_get_impl(command_list)->Close();
 			assert(SUCCEEDED(hr));
@@ -1044,7 +1056,7 @@ int main()
 
 		sp_device_wait_for_idle();
 
-		sp_graphics_command_list_reset(command_list, gbuffer_pipeline_handle);
+		sp_graphics_command_list_reset(command_list, gbuffer_pipeline_state_handle);
 
 		frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	}

@@ -1,5 +1,5 @@
 Texture2D base_color_texture : register(t0);
-Texture2D normal_map_texture : register(t1);
+//Texture2D normal_texture : register(t1);
 
 SamplerState default_sampler : register(s0);
 
@@ -45,8 +45,8 @@ struct ps_input
 struct ps_output
 {
 	float4 base_color : SV_Target0;
-	float4 position_ws : SV_Target1;
-	float4 normal_ws : SV_Target2;
+	float4 normal_ws : SV_Target1;
+	float4 position_ws : SV_Target2;
 };
 
 ps_output ps_main(ps_input input)
@@ -55,7 +55,7 @@ ps_output ps_main(ps_input input)
 
 	output.base_color = base_color_texture.Sample(default_sampler, input.texcoord) * input.color;
 	output.position_ws = input.position_ws;
-	output.normal_ws = input.normal_ws * normal_map_texture.Sample(default_sampler, input.texcoord);
+	output.normal_ws = input.normal_ws;
 
 	return output;
 }
