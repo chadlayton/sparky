@@ -1,6 +1,6 @@
-Texture2D base_color_texture : register(t1);
-Texture2D normal_map_texture : register(t2);
-Texture2D position_texture : register(t3);
+Texture2D base_color_texture : register(t0);
+Texture2D normal_map_texture : register(t1);
+Texture2D position_texture : register(t2);
 
 SamplerState default_sampler : register(s0);
 

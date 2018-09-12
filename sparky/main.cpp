@@ -74,6 +74,11 @@ struct sp
 	unsigned _render_target_view_descriptor_size;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE _render_target_view_cpu_descriptor_handle;
 
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _shader_resource_view_shader_visible_descriptor_heap;
+	unsigned _shader_resource_view_shader_visible_descriptor_size;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE _shader_resource_view_cpu_shader_visible_descriptor_handle;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE _shader_resource_view_gpu_shader_visible_descriptor_handle;
+
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _shader_resource_view_descriptor_heap;
 	unsigned _shader_resource_view_descriptor_size;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE _shader_resource_view_cpu_descriptor_handle;
@@ -216,14 +221,28 @@ void sp_init(const sp_window& window)
 	unsigned shader_resource_view_descriptor_size;
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC shader_resource_view_descriptor_heap_desc_d3d12 = {};
-		shader_resource_view_descriptor_heap_desc_d3d12.NumDescriptors = 32; // TODO: Hardcoded
+		shader_resource_view_descriptor_heap_desc_d3d12.NumDescriptors = 1024; // TODO: Hardcoded
 		shader_resource_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		shader_resource_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		shader_resource_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
 		hr = device->CreateDescriptorHeap(&shader_resource_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&shader_resource_view_descriptor_heap));
 		assert(SUCCEEDED(hr));
 
 		shader_resource_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shader_resource_view_shader_visible_descriptor_heap;
+	unsigned shader_resource_view_shader_visible_descriptor_size;
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC shader_resource_view_descriptor_heap_desc_d3d12 = {};
+		shader_resource_view_descriptor_heap_desc_d3d12.NumDescriptors = 32; // TODO: Hardcoded
+		shader_resource_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		shader_resource_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+		hr = device->CreateDescriptorHeap(&shader_resource_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&shader_resource_view_shader_visible_descriptor_heap));
+		assert(SUCCEEDED(hr));
+
+		shader_resource_view_shader_visible_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
 	/*
@@ -243,7 +262,7 @@ void sp_init(const sp_window& window)
 	{
 		// TODO: Hardcoded
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
 		// TODO: Hardcoded
 		CD3DX12_ROOT_PARAMETER1 root_parameters[1];
@@ -284,6 +303,10 @@ void sp_init(const sp_window& window)
 	_sp._shader_resource_view_descriptor_heap = shader_resource_view_descriptor_heap;
 	_sp._shader_resource_view_descriptor_size = shader_resource_view_descriptor_size;
 	_sp._shader_resource_view_cpu_descriptor_handle.InitOffsetted(shader_resource_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
+	_sp._shader_resource_view_shader_visible_descriptor_heap = shader_resource_view_shader_visible_descriptor_heap;
+	_sp._shader_resource_view_shader_visible_descriptor_size = shader_resource_view_shader_visible_descriptor_size;
+	_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.InitOffsetted(shader_resource_view_shader_visible_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
+	_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.InitOffsetted(shader_resource_view_shader_visible_descriptor_heap->GetGPUDescriptorHandleForHeapStart(), 0);
 	_sp._root_signature = root_signature;
 
 	// Create a RTV for each buffer in the swap chain
@@ -499,18 +522,16 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	}
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
-	pipeline_state_desc.InputLayout = { input_element_desc, input_element_count };
 	pipeline_state_desc.pRootSignature = _sp._root_signature.Get();
 	pipeline_state_desc.VS = CD3DX12_SHADER_BYTECODE(sp_vertex_shader_get_impl(desc._vertex_shader_handle));
 	pipeline_state_desc.PS = CD3DX12_SHADER_BYTECODE(sp_pixel_shader_get_impl(desc._pixel_shader_handle));
-	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	pipeline_state_desc.SampleMask = UINT_MAX;
+	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
 	pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
-	pipeline_state_desc.SampleMask = UINT_MAX;
+	pipeline_state_desc.InputLayout = { input_element_desc, input_element_count };
 	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	//pipeline_desc.NumRenderTargets = 1;
-	//pipeline_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	unsigned render_target_count = 0;
 	for (; render_target_count < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++render_target_count)
 	{
@@ -744,7 +765,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	texture._height = desc._height;
 
 	// TODO: Including the SRV and RTV in the texture isn't ideal. Need to lookup texture by handle just to
-	// get another handle. Maybe host should deal with these + organizing into tables.
+	// get another handle. Maybe host should deal with these + organizing into descriptor tables.
 
 	// Create an SRV for the texture
 	D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
@@ -772,6 +793,7 @@ void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, 
 {
 	sp_texture& texture = _sp.textures[texture_handle.index];
 
+	// TODO: Should this use a copy command list/queue
 	sp_graphics_command_list texture_update_command_list = sp_graphics_command_list_create(texture._name, {});
 
 	// TODO: Buffer size
@@ -947,8 +969,8 @@ int main()
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024 });
 	sp_texture_update(checkerboard_big_texture_handle, nullptr, 0);
 
-	//sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128 });
-	//sp_texture_update(checkerboard_small_texture_handle, nullptr, 0);
+	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128 });
+	sp_texture_update(checkerboard_small_texture_handle, nullptr, 0);
 
 	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height });
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height });
@@ -982,10 +1004,9 @@ int main()
 			// Set necessary state.
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootSignature(_sp._root_signature.Get());
 
-			// TODO: This is putting all textures in the same heap and all available to shaders
-			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._shader_resource_view_descriptor_heap.Get() };
+			// XXX: SetDescriptorHeaps is fairly expensive. Want to do once per command list.
+			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._shader_resource_view_shader_visible_descriptor_heap.Get() };
 			sp_graphics_command_list_get_impl(command_list)->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps)), descriptor_heaps);
-			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_descriptor_heap->GetGPUDescriptorHandleForHeapStart());
 
 			CD3DX12_VIEWPORT viewport(0.0f, 0.0f, static_cast<float>(window_width), static_cast<float>(window_height));
 			sp_graphics_command_list_get_impl(command_list)->RSSetViewports(1, &viewport);
@@ -1000,7 +1021,7 @@ int main()
 
 			// Checkerboard texture used as shader resource
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-			//sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 			D3D12_CPU_DESCRIPTOR_HANDLE gbuffer_render_target_views[] = {
 				sp_texture_get_hack(gbuffer_base_color_texture_handle)._render_target_view,
@@ -1008,6 +1029,11 @@ int main()
 				sp_texture_get_hack(gbuffer_position_texture_handle)._render_target_view,
 			};
 			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(gbuffer_render_target_views)), gbuffer_render_target_views, false, nullptr);
+
+			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(checkerboard_small_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 
 			sp_graphics_command_list_get_impl(command_list)->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			sp_graphics_command_list_set_vertex_buffers(command_list, &triangle_vertex_buffer_handle, 1);
@@ -1032,6 +1058,17 @@ int main()
 			//const float clear_color[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 			//sp_graphics_command_list_get_impl(command_list)->ClearRenderTargetView(back_buffer_view_handle_cpu, clear_color, 0, nullptr);
 
+			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_base_color_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_normals_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_position_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+
 			sp_graphics_command_list_get_impl(command_list)->DrawInstanced(3, 1, 0, 0);
 
 			// Indicate that the back buffer will now be used to present.
@@ -1044,10 +1081,14 @@ int main()
 
 			// Restore checkerboard texture to default
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-			//sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
+			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
 
 			HRESULT hr = sp_graphics_command_list_get_impl(command_list)->Close();
 			assert(SUCCEEDED(hr));
+
+			// Reset
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.InitOffsetted(_sp._shader_resource_view_shader_visible_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.InitOffsetted(_sp._shader_resource_view_shader_visible_descriptor_heap->GetGPUDescriptorHandleForHeapStart(), 0);
 		}
 
 		sp_graphics_queue_execute(command_list);
