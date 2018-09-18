@@ -18,6 +18,7 @@
 #include "d3dx12.h"
 #include "window.h"
 #include "handle.h"
+#include "math.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -50,6 +51,77 @@ struct sp_vertex_buffer
 	D3D12_VERTEX_BUFFER_VIEW _vertex_buffer_view;
 };
 
+enum class sp_texture_format
+{
+	unknown,
+	r8g8b8a8,
+	d16,
+	d32,
+};
+
+namespace detail
+{
+	bool sp_texture_format_is_depth(sp_texture_format format)
+	{
+		switch (format)
+		{
+		case sp_texture_format::unknown:  assert(false); return false;
+		case sp_texture_format::r8g8b8a8: return false;
+		case sp_texture_format::d16:      return true;
+		case sp_texture_format::d32:      return true;
+		};
+
+		assert(false);
+
+		return false;
+	}
+
+	DXGI_FORMAT sp_texture_format_get_base_format_d3d12(sp_texture_format format)
+	{
+		switch (format)
+		{
+		case sp_texture_format::unknown:  assert(false); return DXGI_FORMAT_UNKNOWN;
+		case sp_texture_format::r8g8b8a8: return DXGI_FORMAT_R8G8B8A8_TYPELESS;
+		case sp_texture_format::d16:      return DXGI_FORMAT_R16_TYPELESS;
+		case sp_texture_format::d32:      return DXGI_FORMAT_R32_TYPELESS;
+		};
+
+		assert(false);
+
+		return DXGI_FORMAT_UNKNOWN;
+	}
+
+	DXGI_FORMAT sp_texture_format_get_srv_format_d3d12(sp_texture_format format)
+	{
+		switch (format)
+		{
+		case sp_texture_format::unknown:  assert(false); return DXGI_FORMAT_UNKNOWN;
+		case sp_texture_format::r8g8b8a8: return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case sp_texture_format::d16:      return DXGI_FORMAT_R16_FLOAT;
+		case sp_texture_format::d32:      return DXGI_FORMAT_R32_FLOAT;
+		};
+
+		assert(false);
+
+		return DXGI_FORMAT_UNKNOWN;
+	}
+
+	DXGI_FORMAT sp_texture_format_get_dsv_format_d3d12(sp_texture_format format)
+	{
+		switch (format)
+		{
+		case sp_texture_format::unknown:  assert(false); return DXGI_FORMAT_UNKNOWN;
+		case sp_texture_format::r8g8b8a8: assert(false); return DXGI_FORMAT_UNKNOWN;
+		case sp_texture_format::d16:      return DXGI_FORMAT_D16_UNORM;
+		case sp_texture_format::d32:      return DXGI_FORMAT_D32_FLOAT;
+		};
+
+		assert(false);
+
+		return DXGI_FORMAT_UNKNOWN;
+	}
+}
+
 struct sp_texture
 {
 	const char* _name;
@@ -59,6 +131,7 @@ struct sp_texture
 
 	D3D12_CPU_DESCRIPTOR_HANDLE _render_target_view;
 	D3D12_CPU_DESCRIPTOR_HANDLE _shader_resource_view;
+	D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil_view;
 };
 
 struct sp
@@ -73,6 +146,10 @@ struct sp
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _render_target_view_descriptor_heap;
 	unsigned _render_target_view_descriptor_size;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE _render_target_view_cpu_descriptor_handle;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _depth_stencil_view_descriptor_heap;
+	unsigned _depth_stencil_view_descriptor_size;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE _depth_stencil_view_cpu_descriptor_handle;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _shader_resource_view_shader_visible_descriptor_heap;
 	unsigned _shader_resource_view_shader_visible_descriptor_size;
@@ -202,10 +279,10 @@ void sp_init(const sp_window& window)
 	hr = dxgi_factory->MakeWindowAssociation(static_cast<HWND>(window._handle), DXGI_MWA_NO_ALT_ENTER);
 	assert(SUCCEEDED(hr));
 
+	// TODO: Wrap heaps
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> render_target_view_descriptor_heap;
 	unsigned render_target_view_descriptor_size;
 	{
-		// Describe and create a render target view (RTV) descriptor heap.
 		D3D12_DESCRIPTOR_HEAP_DESC render_target_view_descriptor_heap_desc_d3d12 = {};
 		render_target_view_descriptor_heap_desc_d3d12.NumDescriptors = k_back_buffer_count + 16; // TODO: Hardcoded
 		render_target_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -214,7 +291,25 @@ void sp_init(const sp_window& window)
 		hr = device->CreateDescriptorHeap(&render_target_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&render_target_view_descriptor_heap));
 		assert(SUCCEEDED(hr));
 
+		render_target_view_descriptor_heap->SetName(L"RTV");
+
 		render_target_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> depth_stencil_view_descriptor_heap;
+	unsigned depth_stencil_view_descriptor_size;
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC depth_stencil_view_descriptor_heap_desc_d3d12 = {};
+		depth_stencil_view_descriptor_heap_desc_d3d12.NumDescriptors = k_back_buffer_count + 16; // TODO: Hardcoded
+		depth_stencil_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+		depth_stencil_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+		hr = device->CreateDescriptorHeap(&depth_stencil_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&depth_stencil_view_descriptor_heap));
+		assert(SUCCEEDED(hr));
+
+		depth_stencil_view_descriptor_heap->SetName(L"DSV");
+
+		depth_stencil_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	}
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shader_resource_view_descriptor_heap;
@@ -227,6 +322,8 @@ void sp_init(const sp_window& window)
 
 		hr = device->CreateDescriptorHeap(&shader_resource_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&shader_resource_view_descriptor_heap));
 		assert(SUCCEEDED(hr));
+
+		depth_stencil_view_descriptor_heap->SetName(L"CBV_SRV_UAV");
 
 		shader_resource_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
@@ -241,6 +338,8 @@ void sp_init(const sp_window& window)
 
 		hr = device->CreateDescriptorHeap(&shader_resource_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&shader_resource_view_shader_visible_descriptor_heap));
 		assert(SUCCEEDED(hr));
+
+		depth_stencil_view_descriptor_heap->SetName(L"CBV_SRV_UAV (SHADER_VISIBLE)");
 
 		shader_resource_view_shader_visible_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
@@ -300,6 +399,9 @@ void sp_init(const sp_window& window)
 	_sp._render_target_view_descriptor_heap = render_target_view_descriptor_heap;
 	_sp._render_target_view_descriptor_size = render_target_view_descriptor_size;
 	_sp._render_target_view_cpu_descriptor_handle.InitOffsetted(render_target_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
+	_sp._depth_stencil_view_descriptor_heap = depth_stencil_view_descriptor_heap;
+	_sp._depth_stencil_view_descriptor_size = depth_stencil_view_descriptor_size;
+	_sp._depth_stencil_view_cpu_descriptor_handle.InitOffsetted(depth_stencil_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
 	_sp._shader_resource_view_descriptor_heap = shader_resource_view_descriptor_heap;
 	_sp._shader_resource_view_descriptor_size = shader_resource_view_descriptor_size;
 	_sp._shader_resource_view_cpu_descriptor_handle.InitOffsetted(shader_resource_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
@@ -495,6 +597,7 @@ struct sp_graphics_pipeline_state_desc
 	sp_pixel_shader_handle _pixel_shader_handle;
 	sp_input_element_desc _input_layout[D3D12_STANDARD_VERTEX_ELEMENT_COUNT];
 	DXGI_FORMAT _render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
+	sp_texture_format depth_stencil_format = sp_texture_format::unknown;
 };
 
 sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* name, const sp_graphics_pipeline_state_desc& desc)
@@ -528,7 +631,17 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	pipeline_state_desc.SampleMask = UINT_MAX;
 	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+	if (desc.depth_stencil_format == sp_texture_format::unknown)
+	{
+		pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+	}
+	else
+	{
+		pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
+		pipeline_state_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+		pipeline_state_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+		pipeline_state_desc.DSVFormat = detail::sp_texture_format_get_dsv_format_d3d12(desc.depth_stencil_format);
+	}
 	pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
 	pipeline_state_desc.InputLayout = { input_element_desc, input_element_count };
 	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -688,8 +801,9 @@ void sp_device_wait_for_idle()
 
 struct sp_texture_desc
 {
-	int _width;
-	int _height;
+	int width;
+	int height;
+	sp_texture_format format;
 };
 
 const UINT g_pixel_size_bytes = 4;
@@ -735,24 +849,49 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	sp_texture_handle texture_handle = sp_handle_alloc(&_sp.texture_handles);
 	sp_texture& texture = _sp.textures[texture_handle.index];
 
+	// XXX: Is there any performance penalty to creating every texture with either an SRV (and an RTV/DSV)?
+
 	D3D12_RESOURCE_DESC resource_desc_d3d12 = {};
 	resource_desc_d3d12.MipLevels = 1;
-	resource_desc_d3d12.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resource_desc_d3d12.Width = desc._width;
-	resource_desc_d3d12.Height = desc._height;
+	resource_desc_d3d12.Format = detail::sp_texture_format_get_base_format_d3d12(desc.format);
+	resource_desc_d3d12.Width = desc.width;
+	resource_desc_d3d12.Height = desc.height;
 	resource_desc_d3d12.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;//D3D12_RESOURCE_FLAG_NONE; // TODO: Not every texture should be created with an RTV
+	if (detail::sp_texture_format_is_depth(desc.format))
+	{
+		resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	}
+	else
+	{
+		resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	}
 	resource_desc_d3d12.DepthOrArraySize = 1;
 	resource_desc_d3d12.SampleDesc.Count = 1;
 	resource_desc_d3d12.SampleDesc.Quality = 0;
 	resource_desc_d3d12.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+	D3D12_CLEAR_VALUE optimized_clear_value = {};
+	if (detail::sp_texture_format_is_depth(desc.format))
+	{
+		optimized_clear_value.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
+		optimized_clear_value.DepthStencil.Depth = 1.0f;
+		optimized_clear_value.DepthStencil.Stencil = 0;
+	}
+	else
+	{
+		optimized_clear_value.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
+		optimized_clear_value.Color[0] = 0.0f;
+		optimized_clear_value.Color[1] = 0.0f;
+		optimized_clear_value.Color[2] = 0.0f;
+		optimized_clear_value.Color[3] = 0.0f;
+	}
 
 	HRESULT hr = _sp._device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&resource_desc_d3d12,
 		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
+		&optimized_clear_value,
 		IID_PPV_ARGS(&texture._resource));
 	assert(hr == S_OK);
 
@@ -761,30 +900,40 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 #endif
 
 	texture._name = name;
-	texture._width = desc._width;
-	texture._height = desc._height;
+	texture._width = desc.width;
+	texture._height = desc.height;
 
 	// TODO: Including the SRV and RTV in the texture isn't ideal. Need to lookup texture by handle just to
 	// get another handle. Maybe host should deal with these + organizing into descriptor tables.
 
-	// Create an SRV for the texture
 	D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 	shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	shader_resource_view_desc_d3d12.Format = resource_desc_d3d12.Format;
+	shader_resource_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
 	shader_resource_view_desc_d3d12.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	shader_resource_view_desc_d3d12.Texture2D.MipLevels = 1;
 	_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, _sp._shader_resource_view_cpu_descriptor_handle);
 	texture._shader_resource_view = _sp._shader_resource_view_cpu_descriptor_handle;
 	_sp._shader_resource_view_cpu_descriptor_handle.Offset(1, _sp._shader_resource_view_descriptor_size);
 
-	// Create an RTV for the texture
-	D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
-	render_target_view_desc_d3d12.Format = resource_desc_d3d12.Format;
-	render_target_view_desc_d3d12.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-	render_target_view_desc_d3d12.Texture2D.MipSlice = 0;
-	_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, _sp._render_target_view_cpu_descriptor_handle);
-	texture._render_target_view = _sp._render_target_view_cpu_descriptor_handle;
-	_sp._render_target_view_cpu_descriptor_handle.Offset(1, _sp._render_target_view_descriptor_size);
+	if (detail::sp_texture_format_is_depth(desc.format))
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc_d3d12 = {};
+		depth_stencil_view_desc_d3d12.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
+		depth_stencil_view_desc_d3d12.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		_sp._device->CreateDepthStencilView(texture._resource.Get(), &depth_stencil_view_desc_d3d12, _sp._depth_stencil_view_cpu_descriptor_handle);
+		texture._depth_stencil_view = _sp._depth_stencil_view_cpu_descriptor_handle;
+		_sp._depth_stencil_view_cpu_descriptor_handle.Offset(1, _sp._depth_stencil_view_descriptor_size);
+	}
+	else
+	{
+		D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
+		render_target_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
+		render_target_view_desc_d3d12.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		render_target_view_desc_d3d12.Texture2D.MipSlice = 0;
+		_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, _sp._render_target_view_cpu_descriptor_handle);
+		texture._render_target_view = _sp._render_target_view_cpu_descriptor_handle;
+		_sp._render_target_view_cpu_descriptor_handle.Offset(1, _sp._render_target_view_descriptor_size);
+	}
 	
 	return texture_handle;
 }
@@ -921,6 +1070,22 @@ void sp_graphics_command_list_set_vertex_buffers(const sp_graphics_command_list&
 //
 //}
 
+struct camera
+{
+	math::vec<3> position;
+	math::vec<3> rotation;
+};
+
+math::mat<4> camera_get_transform(const camera& camera)
+{
+	math::mat<4> transform = math::create_identity<4>();
+	transform = math::multiply(transform, math::create_rotation_x(camera.rotation.x));
+	transform = math::multiply(transform, math::create_rotation_x(camera.rotation.y));
+	transform = math::multiply(transform, math::create_rotation_x(camera.rotation.z));
+	math::set_translation(transform, camera.position);
+	return transform;
+}
+
 int main()
 {
 	const int window_width = 1280;
@@ -930,6 +1095,20 @@ int main()
 	sp_window window = sp_window_create(L"demo", window_width, window_height);
 
 	sp_init(window);
+
+	camera camera{ { 0, 0, -10 }, {0, 0, 0} };
+
+	math::vec<3> point_ws = { 0, 5, 0 };
+
+	math::mat<4> view_matrix = math::inverse(camera_get_transform(camera));
+
+	math::vec<3> point_vs = math::transform_point(view_matrix, point_ws);
+
+	math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
+
+	math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
+
+	math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
 	int frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 
@@ -948,8 +1127,8 @@ int main()
 		{
 			DXGI_FORMAT_R8G8B8A8_UNORM,
 			DXGI_FORMAT_R8G8B8A8_UNORM,
-			DXGI_FORMAT_R8G8B8A8_UNORM,
 		},
+		sp_texture_format::d32
 	});
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
@@ -966,15 +1145,15 @@ int main()
 
 	sp_graphics_command_list command_list = sp_graphics_command_list_create("main", { gbuffer_pipeline_state_handle });
 
-	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024 });
+	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(checkerboard_big_texture_handle, nullptr, 0);
 
-	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128 });
+	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(checkerboard_small_texture_handle, nullptr, 0);
 
-	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height });
-	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height });
-	sp_texture_handle gbuffer_position_texture_handle = sp_texture_create("gbuffer_position", { window_width, window_height });
+	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, sp_texture_format::r8g8b8a8 });
+	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, sp_texture_format::r8g8b8a8 });
+	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, sp_texture_format::d32 });
 
 	sp_vertex_buffer_handle triangle_vertex_buffer_handle;
 	{
@@ -988,9 +1167,9 @@ int main()
 
 		vertex triangle_vertices[] =
 		{
-			{ { 0.0f, 0.25f * aspect_ratio, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.25f, -0.25f * aspect_ratio, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.25f, -0.25f * aspect_ratio, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+			{ { 0.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
 		};
 
 		triangle_vertex_buffer_handle = sp_vertex_buffer_create("triangle", { sizeof(triangle_vertices), sizeof(vertex) });
@@ -1017,18 +1196,19 @@ int main()
 			// TODO: All textures start out in D3D12_RESOURCE_STATE_COPY_DEST
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_normals_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_position_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
+			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_depth_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 			// Checkerboard texture used as shader resource
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
+			sp_graphics_command_list_get_impl(command_list)->ClearDepthStencilView(sp_texture_get_hack(gbuffer_depth_texture_handle)._depth_stencil_view, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
+
 			D3D12_CPU_DESCRIPTOR_HANDLE gbuffer_render_target_views[] = {
 				sp_texture_get_hack(gbuffer_base_color_texture_handle)._render_target_view,
 				sp_texture_get_hack(gbuffer_normals_texture_handle)._render_target_view,
-				sp_texture_get_hack(gbuffer_position_texture_handle)._render_target_view,
 			};
-			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(gbuffer_render_target_views)), gbuffer_render_target_views, false, nullptr);
+			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(gbuffer_render_target_views)), gbuffer_render_target_views, false, &sp_texture_get_hack(gbuffer_depth_texture_handle)._depth_stencil_view);
 
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
 			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(checkerboard_small_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1044,7 +1224,7 @@ int main()
 			// Indicate that the gbuffer textures will be used as pixel shader resources
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_normals_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_position_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_depth_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
 			// Indicate that the back buffer will be used as a render target.
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(_sp._back_buffers[frame_index].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -1065,7 +1245,7 @@ int main()
 			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_normals_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_position_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_depth_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 
@@ -1077,7 +1257,7 @@ int main()
 			// Put the gbuffer textures back into default state for next frame
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_normals_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_position_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
+			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_depth_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
 
 			// Restore checkerboard texture to default
 			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));

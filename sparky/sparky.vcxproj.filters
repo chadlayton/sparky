@@ -18,5 +18,8 @@
     <ClInclude Include="window.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="math.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
