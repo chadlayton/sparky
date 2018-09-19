@@ -179,6 +179,8 @@ struct sp
 
 } _sp;
 
+#include "constant_buffer.h"
+
 using sp_vertex_shader_handle = sp_handle;
 using sp_pixel_shader_handle = sp_handle;
 using sp_graphics_pipeline_state_handle = sp_handle;
@@ -360,12 +362,13 @@ void sp_init(const sp_window& window)
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
 	{
 		// TODO: Hardcoded
-		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
 		// TODO: Hardcoded
 		CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-		root_parameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+		root_parameters[0].InitAsDescriptorTable(static_cast<unsigned>(std::size(ranges)), &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -425,6 +428,7 @@ void sp_init(const sp_window& window)
 	sp_handle_pool_init(&_sp.texture_handles, static_cast<int>(_sp.textures.size()));
 	sp_handle_pool_init(&_sp.vertex_buffer_handles, static_cast<int>(_sp.vertex_buffers.size()));
 	sp_handle_pool_init(&_sp.graphics_pipeline_handles, static_cast<int>(_sp.graphics_pipelines.size()));
+	sp_handle_pool_init(&detail::resource_pools::constant_buffer_handles, static_cast<int>(detail::resource_pools::constant_buffers.size()));
 }
 
 void sp_shutdown()
@@ -511,10 +515,10 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 	sp_vertex_shader_handle shader_handle = sp_handle_alloc(&_sp.vertex_shader_handles);
 	sp_vertex_shader& shader = _sp.vertex_shaders[shader_handle.index];
 
+	UINT compile_flags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR; // XXX: Would be nice for performance if matrices were row major already
+
 #if defined(_DEBUG)
-	UINT compile_flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
-#else
-	UINT compile_flags = 0;
+	compile_flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
 #endif
 
 	ID3DBlob* error_blob = nullptr;
@@ -524,7 +528,7 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 		nullptr, 
 		"vs_main", 
 		"vs_5_0", 
-		compile_flags, 
+		compile_flags,
 		0,
 		&shader._blob,
 		&error_blob);
@@ -545,10 +549,10 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 	sp_pixel_shader_handle shader_handle = sp_handle_alloc(&_sp.pixel_shader_handles);
 	sp_pixel_shader& shader = _sp.pixel_shaders[shader_handle.index];
 
+	UINT compile_flags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR; // XXX: Would be nice for performance if matrices were row major alread
+
 #if defined(_DEBUG)
-	UINT compile_flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-	UINT compile_flags = 0;
+	compile_flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
 #endif
 
 	ID3DBlob* error_blob = nullptr;
@@ -1143,6 +1147,21 @@ int main()
 		},
 	});
 
+	__declspec(align(16)) struct
+	{
+		math::mat<4> projection_matrix;
+		math::mat<4> view_projection_matrix;
+		math::mat<4> inverse_view_projection_matrix;
+
+	} constant_buffer_per_frame_data;
+
+	constant_buffer_per_frame_data.projection_matrix = projection_matrix;
+	constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
+	constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
+
+	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) } );
+	sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
+
 	sp_graphics_command_list command_list = sp_graphics_command_list_create("main", { gbuffer_pipeline_state_handle });
 
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
@@ -1165,11 +1184,12 @@ int main()
 			DirectX::XMFLOAT4 color;
 		};
 
+		// XXX: There's no model/world transform yet so vertices are in world space
 		vertex triangle_vertices[] =
 		{
-			{ { 0.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+			{ { 0.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
 		};
 
 		triangle_vertex_buffer_handle = sp_vertex_buffer_create("triangle", { sizeof(triangle_vertices), sizeof(vertex) });
@@ -1180,10 +1200,9 @@ int main()
 	{
 		// Record all the commands we need to render the scene into the command list.
 		{
-			// Set necessary state.
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootSignature(_sp._root_signature.Get());
 
-			// XXX: SetDescriptorHeaps is fairly expensive. Want to do once per command list.
+			// The call to SetDescriptorHeaps is expensive. Only want to do once per command list.
 			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._shader_resource_view_shader_visible_descriptor_heap.Get() };
 			sp_graphics_command_list_get_impl(command_list)->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps)), descriptor_heaps);
 
@@ -1211,7 +1230,15 @@ int main()
 			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(gbuffer_render_target_views)), gbuffer_render_target_views, false, &sp_texture_get_hack(gbuffer_depth_texture_handle)._depth_stencil_view);
 
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
+			// Copy SRV
 			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(checkerboard_small_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			// Increment to start of CBV range
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(11, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(11, _sp._shader_resource_view_shader_visible_descriptor_size);
+			// Copy CBV
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 
@@ -1239,6 +1266,7 @@ int main()
 			//sp_graphics_command_list_get_impl(command_list)->ClearRenderTargetView(back_buffer_view_handle_cpu, clear_color, 0, nullptr);
 
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
+			// Copy SRV
 			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_base_color_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
@@ -1248,6 +1276,14 @@ int main()
 			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_texture_get_hack(gbuffer_depth_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			// Increment to start of CBV range
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(9, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(9, _sp._shader_resource_view_shader_visible_descriptor_size);
+			// Copy CBV
+			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+
 
 			sp_graphics_command_list_get_impl(command_list)->DrawInstanced(3, 1, 0, 0);
 

@@ -3,9 +3,11 @@ Texture2D base_color_texture : register(t0);
 
 SamplerState default_sampler : register(s0);
 
-cbuffer constants_per_frame // per_batch, per_instance, per_material, etc
+cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_material, etc
 {
+	float4x4 projection_matrix;
 	float4x4 view_projection_matrix;
+	float4x4 inverse_view_projection_matrix;
 };
 
 struct vs_input
@@ -26,7 +28,7 @@ struct vs_output
 
 vs_output vs_main(vs_input input)
 {
-	float4x4 world_view_projection_matrix = { { 0.5625, 0, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0, 1, 1 }, { 0, 0, 9.8098, 10 } };
+	float4x4 world_view_projection_matrix = view_projection_matrix;
 
 	vs_output output;
 
@@ -50,15 +52,13 @@ struct ps_output
 {
 	float4 base_color : SV_Target0;
 	float4 normal_ws : SV_Target1;
-	float4 position_ws : SV_Target2;
 };
 
 ps_output ps_main(ps_input input)
 {
 	ps_output output;
 
-	output.position_ws = input.normal_ws;
-	output.normal_ws = input.normal_ws;
+	output.normal_ws = (input.normal_ws + 1) / 2;
 	output.base_color = base_color_texture.Sample(default_sampler, input.texcoord) * input.color;
 
 	return output;

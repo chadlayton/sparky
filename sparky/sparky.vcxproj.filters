@@ -21,5 +21,8 @@
     <ClInclude Include="math.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="constant_buffer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
