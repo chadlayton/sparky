@@ -8,6 +8,8 @@
 #include <array>
 #include <vector>
 
+#include <RenderDoc\renderdoc_app.h>
+
 #include <d3d12.h>
 #include <dxgi1_3.h>
 #include <dxgi1_4.h>
@@ -1074,6 +1076,8 @@ void sp_graphics_command_list_set_vertex_buffers(const sp_graphics_command_list&
 //
 //}
 
+// sp_render_pass gbuffer_render_pass = sp_render_pass_create("gbuffer", desc);
+
 struct camera
 {
 	math::vec<3> position;
@@ -1092,6 +1096,14 @@ math::mat<4> camera_get_transform(const camera& camera)
 
 int main()
 {
+	if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
+	{
+		RENDERDOC_API_1_1_2* RENDERDOC_API = nullptr;
+		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+		int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&RENDERDOC_API);
+		assert(ret == 1);
+	}
+
 	const int window_width = 1280;
 	const int window_height = 720;
 	const float aspect_ratio = window_width / static_cast<float>(window_height);
@@ -1261,9 +1273,6 @@ int main()
 				back_buffer_view_handle_cpu,
 			};
 			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(lighting_render_target_views)), lighting_render_target_views, false, nullptr);
-
-			//const float clear_color[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-			//sp_graphics_command_list_get_impl(command_list)->ClearRenderTargetView(back_buffer_view_handle_cpu, clear_color, 0, nullptr);
 
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
 			// Copy SRV
