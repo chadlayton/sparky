@@ -7,6 +7,7 @@
 #include <codecvt>
 #include <array>
 #include <vector>
+#include <utility>
 
 #include <RenderDoc\renderdoc_app.h>
 
@@ -15,7 +16,7 @@
 #include <dxgi1_4.h>
 //#include <pix3.h>
 #include <D3Dcompiler.h>
-#include <DirectXMath.h>
+#include <DirectXMath.h>s
 
 #include "d3dx12.h"
 #include "window.h"
@@ -27,6 +28,8 @@
 #pragma comment(lib, "d3dcompiler.lib")
 
 #define GRAPHICS_OBJECT_DEBUG_NAMING_ENABLED 1 
+
+#define SP_SET_RENDER_TARGET_API_ENABLED 1
 
 const int k_back_buffer_count = 2;
 
@@ -134,7 +137,15 @@ struct sp_texture
 	D3D12_CPU_DESCRIPTOR_HANDLE _render_target_view;
 	D3D12_CPU_DESCRIPTOR_HANDLE _shader_resource_view;
 	D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil_view;
+
+	D3D12_RESOURCE_STATES _default_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 };
+
+using sp_vertex_shader_handle = sp_handle;
+using sp_pixel_shader_handle = sp_handle;
+using sp_graphics_pipeline_state_handle = sp_handle;
+using sp_vertex_buffer_handle = sp_handle;
+using sp_texture_handle = sp_handle;
 
 struct sp
 {
@@ -142,8 +153,6 @@ struct sp
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> _back_buffers[k_back_buffer_count];
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _render_target_view_descriptor_heap;
 	unsigned _render_target_view_descriptor_size;
@@ -179,15 +188,11 @@ struct sp
 	std::array<sp_graphics_pipeline_state, 1024> graphics_pipelines;
 	sp_handle_pool graphics_pipeline_handles;
 
+	sp_texture_handle _back_buffer_texture_handles[k_back_buffer_count];
+
 } _sp;
 
 #include "constant_buffer.h"
-
-using sp_vertex_shader_handle = sp_handle;
-using sp_pixel_shader_handle = sp_handle;
-using sp_graphics_pipeline_state_handle = sp_handle;
-using sp_vertex_buffer_handle = sp_handle;
-using sp_texture_handle = sp_handle;
 
 void sp_init(const sp_window& window)
 {
@@ -416,21 +421,37 @@ void sp_init(const sp_window& window)
 	_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.InitOffsetted(shader_resource_view_shader_visible_descriptor_heap->GetGPUDescriptorHandleForHeapStart(), 0);
 	_sp._root_signature = root_signature;
 
-	// Create a RTV for each buffer in the swap chain
-	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; back_buffer_index++)
-	{
-		hr = swap_chain3->GetBuffer(back_buffer_index, IID_PPV_ARGS(&_sp._back_buffers[back_buffer_index]));
-		assert(SUCCEEDED(hr));
-		device->CreateRenderTargetView(_sp._back_buffers[back_buffer_index].Get(), nullptr, _sp._render_target_view_cpu_descriptor_handle);
-		_sp._render_target_view_cpu_descriptor_handle.Offset(1, _sp._render_target_view_descriptor_size);
-	}
-
 	sp_handle_pool_init(&_sp.vertex_shader_handles, static_cast<int>(_sp.vertex_shaders.size()));
 	sp_handle_pool_init(&_sp.pixel_shader_handles, static_cast<int>(_sp.pixel_shaders.size()));
 	sp_handle_pool_init(&_sp.texture_handles, static_cast<int>(_sp.textures.size()));
 	sp_handle_pool_init(&_sp.vertex_buffer_handles, static_cast<int>(_sp.vertex_buffers.size()));
 	sp_handle_pool_init(&_sp.graphics_pipeline_handles, static_cast<int>(_sp.graphics_pipelines.size()));
 	sp_handle_pool_init(&detail::resource_pools::constant_buffer_handles, static_cast<int>(detail::resource_pools::constant_buffers.size()));
+
+	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; ++back_buffer_index)
+	{
+		// TODO: sp_texture_create_from_swap_chain?
+
+		_sp._back_buffer_texture_handles[back_buffer_index] = sp_handle_alloc(&_sp.texture_handles);
+		sp_texture& texture = _sp.textures[_sp._back_buffer_texture_handles[back_buffer_index].index];
+
+		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
+		hr = swap_chain3->GetDesc1(&swap_chain_desc);
+		assert(SUCCEEDED(hr));
+
+		texture._name = "swap_chain_buffer";
+		texture._width = swap_chain_desc.Width;
+		texture._height = swap_chain_desc.Height;
+
+		texture._default_state = D3D12_RESOURCE_STATE_PRESENT;
+
+		hr = swap_chain3->GetBuffer(back_buffer_index, IID_PPV_ARGS(&texture._resource));
+		assert(SUCCEEDED(hr));
+
+		device->CreateRenderTargetView(texture._resource.Get(), nullptr, _sp._render_target_view_cpu_descriptor_handle);
+		texture._render_target_view = _sp._render_target_view_cpu_descriptor_handle;
+		_sp._render_target_view_cpu_descriptor_handle.Offset(1, _sp._render_target_view_descriptor_size);
+	}
 }
 
 void sp_shutdown()
@@ -689,6 +710,9 @@ struct sp_graphics_command_list
 	const char* _name;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> _command_list_d3d12;
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _command_allocator_d3d12;
+
+	D3D12_RESOURCE_BARRIER _resource_transition_records[64];
+	int _resource_transition_records_count = 0;
 };
 
 sp_graphics_command_list sp_graphics_command_list_create(const char* name, const sp_graphics_command_list_desc& desc)
@@ -810,6 +834,8 @@ struct sp_texture_desc
 	int width;
 	int height;
 	sp_texture_format format;
+	void* data_cpu = nullptr;
+	int size_bytes = 0;
 };
 
 const UINT g_pixel_size_bytes = 4;
@@ -896,7 +922,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&resource_desc_d3d12,
-		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 		&optimized_clear_value,
 		IID_PPV_ARGS(&texture._resource));
 	assert(hr == S_OK);
@@ -944,7 +970,103 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	return texture_handle;
 }
 
-void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, size_t size_bytes)
+namespace detail
+{
+	void sp_graphics_command_list_restore_default_resource_states(sp_graphics_command_list& command_list)
+	{
+		if (command_list._resource_transition_records_count > 0)
+		{
+			D3D12_RESOURCE_BARRIER render_target_transitions[64];
+
+			memcpy(&render_target_transitions, command_list._resource_transition_records, command_list._resource_transition_records_count * sizeof(D3D12_RESOURCE_BARRIER));
+
+			for (int i = 0; i < command_list._resource_transition_records_count; ++i)
+			{
+				std::swap(render_target_transitions[i].Transition.StateBefore, render_target_transitions[i].Transition.StateAfter);
+			}
+
+			command_list._command_list_d3d12->ResourceBarrier(command_list._resource_transition_records_count, render_target_transitions);
+
+			command_list._resource_transition_records_count = 0;
+		}
+	}
+}
+
+void sp_graphics_command_list_set_vertex_buffers(sp_graphics_command_list& command_list, sp_vertex_buffer_handle* vertex_buffer_handles, unsigned vertex_buffer_count)
+{
+	D3D12_VERTEX_BUFFER_VIEW vertex_buffer_views[D3D12_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
+	for (unsigned i = 0; i < vertex_buffer_count; ++i)
+	{
+		const sp_vertex_buffer& buffer = _sp.vertex_buffers[vertex_buffer_handles[i].index];
+
+		memcpy(&vertex_buffer_views[i], &buffer._vertex_buffer_view, sizeof(D3D12_VERTEX_BUFFER_VIEW));
+	}
+
+	command_list._command_list_d3d12->IASetVertexBuffers(0, vertex_buffer_count, vertex_buffer_views);
+}
+
+void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& command_list, sp_texture_handle* render_target_handles, int render_target_count, sp_texture_handle depth_stencil_handle)
+{
+	detail::sp_graphics_command_list_restore_default_resource_states(command_list);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE render_target_views[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
+
+	for (int i = 0; i < render_target_count; ++i)
+	{
+		const sp_texture& texture = _sp.textures[render_target_handles[i].index];
+
+		render_target_views[i] = texture._render_target_view;
+	}
+
+	// XXX: How do I track previous state? I can't put it on the resource itself because we might be touching it from multiple threads.
+	// So put it on the command list? But those can be recorded in any order. Right now I just assume everything is in default state 
+	// and transition from there. The command list records any transitions from the default state and we restore them before any new
+	// ones. This means some wasted transitions but maybe we don't care. Next would probably be a frame graph?
+	D3D12_RESOURCE_BARRIER render_target_transitions[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT + 1];
+
+	for (int i = 0; i < render_target_count; ++i)
+	{
+		const sp_texture& texture = _sp.textures[render_target_handles[i].index];
+
+		render_target_transitions[i] = CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), texture._default_state, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+
+	int set_render_target_transitions_count = render_target_count;
+
+	const D3D12_CPU_DESCRIPTOR_HANDLE* depth_stencil_view = nullptr;
+
+	if (depth_stencil_handle)
+	{
+		const sp_texture& texture = _sp.textures[depth_stencil_handle.index];
+
+		render_target_transitions[set_render_target_transitions_count] = CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), texture._default_state, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+		++set_render_target_transitions_count;
+
+		depth_stencil_view = &texture._depth_stencil_view;
+	}
+
+	memcpy(&command_list._resource_transition_records, render_target_transitions, set_render_target_transitions_count * sizeof(D3D12_RESOURCE_BARRIER));
+	command_list._resource_transition_records_count = set_render_target_transitions_count;
+
+	command_list._command_list_d3d12->ResourceBarrier(set_render_target_transitions_count, &render_target_transitions[0]);
+
+	command_list._command_list_d3d12->OMSetRenderTargets(
+		render_target_count,
+		render_target_views,
+		false,
+		depth_stencil_view);
+}
+
+void sp_graphics_command_list_close(sp_graphics_command_list& command_list)
+{
+	detail::sp_graphics_command_list_restore_default_resource_states(command_list);
+
+	HRESULT hr = command_list._command_list_d3d12->Close();
+	assert(SUCCEEDED(hr));
+}
+
+void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, int size_bytes)
 {
 	sp_texture& texture = _sp.textures[texture_handle.index];
 
@@ -953,7 +1075,7 @@ void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, 
 
 	// TODO: Buffer size
 	// Create the GPU upload buffer.
-	const UINT64 upload_buffer_size_bytes = 1024 * 1024 * 128; // GetRequiredIntermediateSize(m_texture.Get(), 0, 1);
+	const int upload_buffer_size_bytes = 1024 * 1024 * 128; // GetRequiredIntermediateSize(m_texture.Get(), 0, 1);
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> texture_upload_buffer;
 
@@ -972,12 +1094,14 @@ void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, 
 
 	// Copy data to the intermediate upload heap and then schedule a copy 
 	// from the upload heap to the Texture2D.
-	std::vector<UINT8> image_data = sp_image_create_checkerboard_data(texture._width, texture._height);
+	std::vector<uint8_t> image_data = sp_image_create_checkerboard_data(texture._width, texture._height);
 
 	D3D12_SUBRESOURCE_DATA subresource_data = {};
 	subresource_data.pData = &image_data[0];
 	subresource_data.RowPitch = texture._width * g_pixel_size_bytes;
 	subresource_data.SlicePitch = subresource_data.RowPitch * texture._height;
+
+	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), texture._default_state, D3D12_RESOURCE_STATE_COPY_DEST));
 
 	UpdateSubresources(texture_update_command_list._command_list_d3d12.Get(),
 		texture._resource.Get(),
@@ -987,7 +1111,9 @@ void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, 
 		1,
 		&subresource_data);
 
-	sp_graphics_command_list_get_impl(texture_update_command_list)->Close();
+	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, texture._default_state));
+
+	sp_graphics_command_list_close(texture_update_command_list);
 
 	sp_graphics_queue_execute(texture_update_command_list);
 
@@ -1009,74 +1135,35 @@ void sp_swap_chain_present()
 	assert(SUCCEEDED(hr));
 }
 
-void sp_graphics_command_list_set_vertex_buffers(const sp_graphics_command_list& command_list, sp_vertex_buffer_handle* vertex_buffer_handles, unsigned vertex_buffer_count)
+struct sx_graphics_render_pass_desc
 {
-	D3D12_VERTEX_BUFFER_VIEW vertex_buffer_views[D3D12_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	for (unsigned i = 0; i < vertex_buffer_count; ++i)
-	{
-		const sp_vertex_buffer& buffer = _sp.vertex_buffers[vertex_buffer_handles[i].index];
 
-		memcpy(&vertex_buffer_views[i], &buffer._vertex_buffer_view, sizeof(D3D12_VERTEX_BUFFER_VIEW));
-	}
+};
 
-	command_list._command_list_d3d12->IASetVertexBuffers(0, vertex_buffer_count, vertex_buffer_views);
+struct sx_graphics_render_pass
+{
+	const char* _name;
+	sp_texture_handle _render_targets[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
+	sp_texture_handle _depth_stencil_target;
+};
+
+sx_graphics_render_pass sx_graphics_render_pass_create(const char* name, sx_graphics_render_pass_desc& desc)
+{
+	return {};
 }
 
-//struct sp_render_pass_desc
-//{
-//	const char* _name;
-//	sp_texture_handle _render_targets[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
-//	sp_texture_handle _depth_stencil_target;
-//};
-//
-//void sp_graphics_command_list_begin_render_pass(const sp_graphics_command_list& command_list, const sp_render_pass_desc& desc)
-//{
-//	D3D12_CPU_DESCRIPTOR_HANDLE render_target_views[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
-//
-//	unsigned render_target_count = 0;
-//	for (; render_target_count < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++render_target_count)
-//	{
-//		if (!desc._render_targets[render_target_count])
-//		{
-//			break;
-//		}
-//
-//		const sp_texture& render_target = _sp.textures[desc._render_targets[render_target_count].index];
-//
-//		render_target_views[render_target_count] = render_target._render_target_view;;
-//	}
-//
-//	if (desc._depth_stencil_target)
-//	{
-//	//	CD3DX12_CPU_DESCRIPTOR_HANDLE render_target_view_cpu_descriptor_handle(
-//	//		_sp._render_target_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart()),
-//	//		color_target._render_target_view_descriptor_heap_offset,
-//	//		_sp._render_target_view_descriptor_size);
-//
-//	//	sp_graphics_command_list_get_impl(desc._depth_stencil_target)
-//
-//	//	sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(
-//	//		render_target_count,
-//	//		render_target_cpu_descriptor_handles,
-//	//		false,
-//	//		sp_graphics_command_list_get_impl(desc._depth_stencil_target));
-//	}
-//	else
-//	{
-//		sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(
-//			render_target_count,
-//			render_target_views,
-//			false,
-//			nullptr);
-//	}
-//}
-//
-//void sp_graphics_command_list_end_end_render_pass()
-//{
-//
-//}
+void sx_graphics_render_pass_record(const sx_graphics_render_pass& pass, sp_graphics_command_list& command_list, void* draw_calls)
+{
+	// events
+	// transitions from D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE to D3D12_RESOURCE_STATE_RENDER_TARGET
+	// bind render targets
+	// draw calls...
+	// unbind render targets
+	// transitions from D3D12_RESOURCE_STATE_RENDER_TARGET back to D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+}
 
-// sp_render_pass gbuffer_render_pass = sp_render_pass_create("gbuffer", desc);
+// sx_graphics_render_pass gbuffer_render_pass = sx_graphics_render_pass_create("gbuffer", desc);
+// sx_graphics_render_pass_record(gbuffer_render_pass, command_list, draw_calls);
 
 struct camera
 {
@@ -1096,13 +1183,13 @@ math::mat<4> camera_get_transform(const camera& camera)
 
 int main()
 {
-	if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
-	{
-		RENDERDOC_API_1_1_2* RENDERDOC_API = nullptr;
-		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
-		int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&RENDERDOC_API);
-		assert(ret == 1);
-	}
+	//if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
+	//{
+	//	RENDERDOC_API_1_1_2* RENDERDOC_API = nullptr;
+	//	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+	//	int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&RENDERDOC_API);
+	//	assert(ret == 1);
+	//}
 
 	const int window_width = 1280;
 	const int window_height = 720;
@@ -1223,23 +1310,13 @@ int main()
 			CD3DX12_RECT scissor_rect(0, 0, window_width, window_height);
 			sp_graphics_command_list_get_impl(command_list)->RSSetScissorRects(1, &scissor_rect);
 
-			// Indicate that the gbuffer textures will be used as render targets.
-			// TODO: All textures start out in D3D12_RESOURCE_STATE_COPY_DEST
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_normals_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_depth_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_DEPTH_WRITE));
-
-			// Checkerboard texture used as shader resource
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+			sp_texture_handle gbuffer_render_target_handles[] = {
+				gbuffer_base_color_texture_handle,
+				gbuffer_normals_texture_handle
+			};
+			sp_graphics_command_list_set_render_targets(command_list, gbuffer_render_target_handles, std::size(gbuffer_render_target_handles), gbuffer_depth_texture_handle);
 
 			sp_graphics_command_list_get_impl(command_list)->ClearDepthStencilView(sp_texture_get_hack(gbuffer_depth_texture_handle)._depth_stencil_view, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
-
-			D3D12_CPU_DESCRIPTOR_HANDLE gbuffer_render_target_views[] = {
-				sp_texture_get_hack(gbuffer_base_color_texture_handle)._render_target_view,
-				sp_texture_get_hack(gbuffer_normals_texture_handle)._render_target_view,
-			};
-			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(gbuffer_render_target_views)), gbuffer_render_target_views, false, &sp_texture_get_hack(gbuffer_depth_texture_handle)._depth_stencil_view);
 
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
 			// Copy SRV
@@ -1260,19 +1337,10 @@ int main()
 
 			sp_graphics_command_list_get_impl(command_list)->SetPipelineState(sp_graphics_pipeline_state_get_impl(lighting_pipeline_state_handle));
 
-			// Indicate that the gbuffer textures will be used as pixel shader resources
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_normals_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_depth_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
-
-			// Indicate that the back buffer will be used as a render target.
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(_sp._back_buffers[frame_index].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-			CD3DX12_CPU_DESCRIPTOR_HANDLE back_buffer_view_handle_cpu(_sp._render_target_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), frame_index, _sp._render_target_view_descriptor_size);
-			D3D12_CPU_DESCRIPTOR_HANDLE lighting_render_target_views[] = {
-				back_buffer_view_handle_cpu,
+			sp_texture_handle lighting_render_target_handles[] = {
+				_sp._back_buffer_texture_handles[frame_index]
 			};
-			sp_graphics_command_list_get_impl(command_list)->OMSetRenderTargets(static_cast<unsigned>(std::size(lighting_render_target_views)), lighting_render_target_views, false, nullptr);
+			sp_graphics_command_list_set_render_targets(command_list, lighting_render_target_handles, std::size(lighting_render_target_handles), {});
 
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
 			// Copy SRV
@@ -1293,23 +1361,9 @@ int main()
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
 
-
 			sp_graphics_command_list_get_impl(command_list)->DrawInstanced(3, 1, 0, 0);
 
-			// Indicate that the back buffer will now be used to present.
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(_sp._back_buffers[frame_index].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-			// Put the gbuffer textures back into default state for next frame
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_base_color_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_normals_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(gbuffer_depth_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-
-			// Restore checkerboard texture to default
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_big_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-			sp_graphics_command_list_get_impl(command_list)->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(sp_texture_get_hack(checkerboard_small_texture_handle)._resource.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST));
-
-			HRESULT hr = sp_graphics_command_list_get_impl(command_list)->Close();
-			assert(SUCCEEDED(hr));
+			sp_graphics_command_list_close(command_list);
 
 			// Reset
 			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.InitOffsetted(_sp._shader_resource_view_shader_visible_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
