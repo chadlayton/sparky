@@ -1,20 +1,21 @@
 #pragma once
 
-#include <array>
-
-#include <wrl.h>
-
-#include <d3d12.h>
-#include <dxgi1_3.h>
-#include <dxgi1_4.h>
-//#include <pix3.h>
-#include <D3Dcompiler.h>
-
-#include "d3dx12.h"
-
 #include "command_list.h"
 #include "constant_buffer.h"
 #include "pipeline.h"
+#include "d3dx12.h"
+
+#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
+#include <RenderDoc\renderdoc_app.h>
+#endif
+
+#include <wrl.h>
+#include <d3d12.h>
+#include <dxgi1_3.h>
+#include <dxgi1_4.h>
+#include <D3Dcompiler.h>
+
+#include <array>
 
 const int k_back_buffer_count = 2;
 
@@ -59,8 +60,33 @@ void sp_graphics_queue_wait_for_idle();
 void sp_device_wait_for_idle();
 void sp_swap_chain_present();
 
+namespace detail
+{
+#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
+	void sp_renderdoc_init()
+	{
+		if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
+		{
+			RENDERDOC_API_1_1_2* renderdoc = nullptr;
+			pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+			int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&renderdoc);
+			assert(ret == 1);
+#if defined(_DEBUG)
+			renderdoc->SetCaptureOptionU32(eRENDERDOC_Option_APIValidation, 1);
+#endif
+			renderdoc->SetCaptureOptionU32(eRENDERDOC_Option_DebugOutputMute, 0);
+	}
+	}
+#endif
+}
+
 void sp_init(const sp_window& window)
 {
+
+#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
+	detail::sp_renderdoc_init();
+#endif
+
 	HRESULT hr = S_FALSE;
 
 	UINT dxgi_factory_flags = 0;

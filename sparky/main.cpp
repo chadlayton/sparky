@@ -1,4 +1,5 @@
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
+#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
 
 #include "handle.h"
 #include "window.h"
@@ -17,8 +18,6 @@
 #include "texture_impl.h"
 #include "vertex_buffer_impl.h"
 #include "shader_impl.h"
-
-#include <RenderDoc\renderdoc_app.h>
 
 #include <string>
 #include <cassert>
@@ -54,18 +53,6 @@ math::mat<4> camera_get_transform(const camera& camera)
 
 int main()
 {
-	if (HMODULE mod = LoadLibraryA("renderdoc.dll"))
-	{
-		RENDERDOC_API_1_1_2* renderdoc = nullptr;
-		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
-		int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&renderdoc);
-		assert(ret == 1);
-#if _DEBUG
-		renderdoc->SetCaptureOptionU32(eRENDERDOC_Option_APIValidation, 1);
-#endif
-		renderdoc->SetCaptureOptionU32(eRENDERDOC_Option_DebugOutputMute, 0);
-	}
-
 	const int window_width = 1280;
 	const int window_height = 720;
 	const float aspect_ratio = window_width / static_cast<float>(window_height);
