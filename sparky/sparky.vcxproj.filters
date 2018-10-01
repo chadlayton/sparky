@@ -27,5 +27,40 @@
     <ClInclude Include="command_list.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="texture.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sparky.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vertex_buffer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vertex_buffer_impl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline_impl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="constant_buffer_impl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_impl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="command_list_impl.h">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="texture_impl.h">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

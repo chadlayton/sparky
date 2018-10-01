@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cassert>
+#include <intsafe.h>
 
 struct sp_handle
 {
@@ -19,7 +20,7 @@ struct sp_handle_pool
 	sp_handle* sparse = nullptr;
 };
 
-void sp_handle_pool_init(sp_handle_pool* handle_pool, int capacity)
+void sp_handle_pool_create(sp_handle_pool* handle_pool, int capacity)
 {
 	assert(capacity < SHORT_MAX && "capacity too large");
 

@@ -1,0 +1,32 @@
+#pragma once
+#include <wrl.h>
+#include <d3d12.h>
+
+#include "handle.h"
+
+struct sp_vertex_buffer_desc
+{
+	int _size_bytes = -1;
+	int _stride_bytes = -1;
+};
+
+struct sp_vertex_buffer
+{
+	const char* _name;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
+	D3D12_VERTEX_BUFFER_VIEW _vertex_buffer_view;
+};
+
+using sp_vertex_buffer_handle = sp_handle;
+
+namespace detail
+{
+	void sp_vertex_buffer_pool_create();
+	void sp_vertex_buffer_pool_destroy();
+	sp_vertex_buffer& sp_vertex_buffer_pool_get(sp_vertex_buffer_handle vertex_buffer_handle);
+}
+
+sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_vertex_buffer_desc& desc);
+ID3D12Resource* sp_vertex_buffer_get_impl(const sp_vertex_buffer_handle& buffer_handle);
+void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, void* data_cpu, size_t size_bytes);
+void sp_vertex_buffer_destroy(const sp_vertex_buffer_handle& buffer_handle);

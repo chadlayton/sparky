@@ -146,9 +146,22 @@
   <ItemGroup>
     <ClInclude Include="command_list.h" />
     <ClInclude Include="constant_buffer.h" />
+    <ClInclude Include="constant_buffer_impl.h" />
     <ClInclude Include="handle.h" />
     <ClInclude Include="math.h" />
+    <ClInclude Include="pipeline.h" />
+    <ClInclude Include="pipeline_impl.h" />
+    <ClInclude Include="shader.h" />
+    <ClInclude Include="shader_impl.h" />
+    <ClInclude Include="sparky.h" />
+    <ClInclude Include="texture.h" />
+    <ClInclude Include="vertex_buffer.h" />
+    <ClInclude Include="vertex_buffer_impl.h" />
     <ClInclude Include="window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="command_list_impl.h" />
+    <None Include="texture_impl.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
