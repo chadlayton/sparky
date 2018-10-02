@@ -136,33 +136,35 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	// TODO: Including the SRV and RTV in the texture isn't ideal. Need to lookup texture by handle just to
 	// get another handle. Maybe host should deal with these + organizing into descriptor tables.
 
+	texture._shader_resource_view = sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu);
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 	shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	shader_resource_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
 	shader_resource_view_desc_d3d12.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	shader_resource_view_desc_d3d12.Texture2D.MipLevels = 1;
-	_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, _sp._shader_resource_view_cpu_descriptor_handle);
-	texture._shader_resource_view = _sp._shader_resource_view_cpu_descriptor_handle;
-	_sp._shader_resource_view_cpu_descriptor_handle.Offset(1, _sp._shader_resource_view_descriptor_size);
+
+	_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, texture._shader_resource_view._handle_cpu_d3d12);
 
 	if (detail::sp_texture_format_is_depth(desc.format))
 	{
+		texture._depth_stencil_view = sp_descriptor_alloc(&_sp._descriptor_heap_dsv_cpu);
+
 		D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc_d3d12 = {};
 		depth_stencil_view_desc_d3d12.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
 		depth_stencil_view_desc_d3d12.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-		_sp._device->CreateDepthStencilView(texture._resource.Get(), &depth_stencil_view_desc_d3d12, _sp._depth_stencil_view_cpu_descriptor_handle);
-		texture._depth_stencil_view = _sp._depth_stencil_view_cpu_descriptor_handle;
-		_sp._depth_stencil_view_cpu_descriptor_handle.Offset(1, _sp._depth_stencil_view_descriptor_size);
+		_sp._device->CreateDepthStencilView(texture._resource.Get(), &depth_stencil_view_desc_d3d12, texture._depth_stencil_view._handle_cpu_d3d12);
 	}
 	else
 	{
+		texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
+
 		D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
 		render_target_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
 		render_target_view_desc_d3d12.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 		render_target_view_desc_d3d12.Texture2D.MipSlice = 0;
 
-		texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv);
 		_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, texture._render_target_view._handle_cpu_d3d12);
 	}
 

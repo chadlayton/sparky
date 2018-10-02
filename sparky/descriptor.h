@@ -3,6 +3,9 @@
 #include <wrl.h>
 #include <d3d12.h>
 
+// TODO: sp_descriptor_heap_cpu and sp_descriptor_heap_gpu? Most heaps are cpu only and tracking gpu 
+// handles has some overhead. And only cbv_srv_uav and samplers can be gpu (shader visible). Would
+// also add type safety.
 struct sp_descriptor_handle
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE _handle_cpu_d3d12;
@@ -17,16 +20,16 @@ enum class sp_descriptor_heap_type
 	dsv,
 };
 
-enum class sp_descriptor_heap_usage
+enum class sp_descriptor_heap_visibility
 {
-	staging,
-	shader_visible
+	cpu_only,
+	cpu_and_gpu
 };
 
 struct sp_descriptor_heap_desc
 {
 	int descriptor_capacity = 128;
-	sp_descriptor_heap_usage visibility = sp_descriptor_heap_usage::staging;
+	sp_descriptor_heap_visibility visibility = sp_descriptor_heap_visibility::cpu_only;
 	sp_descriptor_heap_type type = sp_descriptor_heap_type::cbv_srv_uav;
 };
 
@@ -46,5 +49,9 @@ sp_descriptor_heap sp_descriptor_heap_create(const char* name, const sp_descript
 void sp_descriptor_heap_destroy(sp_descriptor_heap* descriptor_heap);
 
 void sp_descriptor_heap_reset(sp_descriptor_heap* descriptor_heap);
+
+void sp_descriptor_heap_advance(sp_descriptor_heap* descriptor_heap, int descriptor_count);
+
+sp_descriptor_handle sp_descriptor_heap_get_head(const sp_descriptor_heap& descriptor_heap);
 
 sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap);

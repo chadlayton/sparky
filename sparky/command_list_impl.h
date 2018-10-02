@@ -148,7 +148,7 @@ void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& comma
 
 		++set_render_target_transitions_count;
 
-		depth_stencil_view = &texture._depth_stencil_view;
+		depth_stencil_view = &texture._depth_stencil_view._handle_cpu_d3d12;
 	}
 
 	memcpy(&command_list._resource_transition_records, render_target_transitions, set_render_target_transitions_count * sizeof(D3D12_RESOURCE_BARRIER));

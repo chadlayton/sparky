@@ -159,8 +159,8 @@ int main()
 		{
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootSignature(_sp._root_signature.Get());
 
-			// The call to SetDescriptorHeaps is expensive. Only want to do once per command list.
-			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._shader_resource_view_shader_visible_descriptor_heap.Get() };
+			// TODO: The call to SetDescriptorHeaps is expensive. Only want to do once per command list. Only do it automatically when starting new command list.
+			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() };
 			sp_graphics_command_list_get_impl(command_list)->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps)), descriptor_heaps);
 
 			sp_graphics_command_list_set_viewport(command_list, { 0.0f, 0.0f, window_width, window_height });
@@ -172,20 +172,16 @@ int main()
 			};
 			sp_graphics_command_list_set_render_targets(command_list, gbuffer_render_target_handles, static_cast<int>(std::size(gbuffer_render_target_handles)), gbuffer_depth_texture_handle);
 
-			sp_graphics_command_list_get_impl(command_list)->ClearDepthStencilView(detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._depth_stencil_view, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
+			sp_graphics_command_list_get_impl(command_list)->ClearDepthStencilView(detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
 
-			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
+			// XXX: This could all be baked per-draw call
+			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 			// Copy SRV
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, detail::sp_texture_pool_get(checkerboard_small_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(checkerboard_small_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			// Increment to start of CBV range
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(11, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(11, _sp._shader_resource_view_shader_visible_descriptor_size);
+			sp_descriptor_heap_advance(&_sp._descriptor_heap_cbv_srv_uav_gpu, 11);
 			// Copy CBV
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 			sp_graphics_command_list_get_impl(command_list)->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			sp_graphics_command_list_set_vertex_buffers(command_list, &triangle_vertex_buffer_handle, 1);
@@ -198,32 +194,21 @@ int main()
 			};
 			sp_graphics_command_list_set_render_targets(command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
 
-			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, _sp._shader_resource_view_gpu_shader_visible_descriptor_handle);
+			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 			// Copy SRV
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			// Increment to start of CBV range
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(9, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(9, _sp._shader_resource_view_shader_visible_descriptor_size);
+			sp_descriptor_heap_advance(&_sp._descriptor_heap_cbv_srv_uav_gpu, 9);
 			// Copy CBV
-			_sp._device->CopyDescriptorsSimple(1, _sp._shader_resource_view_cpu_shader_visible_descriptor_handle, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.Offset(1, _sp._shader_resource_view_shader_visible_descriptor_size);
+			_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 			sp_graphics_command_list_get_impl(command_list)->DrawInstanced(3, 1, 0, 0);
 
 			sp_graphics_command_list_close(command_list);
 
-			// Reset
-			_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.InitOffsetted(_sp._shader_resource_view_shader_visible_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
-			_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.InitOffsetted(_sp._shader_resource_view_shader_visible_descriptor_heap->GetGPUDescriptorHandleForHeapStart(), 0);
+			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
 		}
 
 		sp_graphics_queue_execute(command_list);

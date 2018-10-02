@@ -1,6 +1,7 @@
 #pragma once
 
 #include "handle.h"
+#include "descriptor.h"
 
 #include <array>
 
@@ -15,7 +16,7 @@ struct sp_constant_buffer
 {
 	const char* _name;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE _constant_buffer_view;
+	sp_descriptor_handle _constant_buffer_view;
 };
 
 using sp_constant_buffer_handle = sp_handle;

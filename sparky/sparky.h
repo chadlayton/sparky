@@ -26,20 +26,10 @@ struct sp
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
 
-	sp_descriptor_heap _descriptor_heap_rtv;
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _depth_stencil_view_descriptor_heap;
-	unsigned _depth_stencil_view_descriptor_size;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE _depth_stencil_view_cpu_descriptor_handle;
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _shader_resource_view_shader_visible_descriptor_heap;
-	unsigned _shader_resource_view_shader_visible_descriptor_size;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE _shader_resource_view_cpu_shader_visible_descriptor_handle;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE _shader_resource_view_gpu_shader_visible_descriptor_handle;
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _shader_resource_view_descriptor_heap;
-	unsigned _shader_resource_view_descriptor_size;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE _shader_resource_view_cpu_descriptor_handle;
+	sp_descriptor_heap _descriptor_heap_rtv_cpu;
+	sp_descriptor_heap _descriptor_heap_dsv_cpu;
+	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu;
+	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_gpu;
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
 
@@ -173,58 +163,9 @@ void sp_init(const sp_window& window)
 		assert(SUCCEEDED(hr));
 	}
 
-	// No support for fullscreen transitions.
+	// TODO: Support for fullscreen transitions.
 	hr = dxgi_factory->MakeWindowAssociation(static_cast<HWND>(window._handle), DXGI_MWA_NO_ALT_ENTER);
 	assert(SUCCEEDED(hr));
-
-	// TODO: Wrap heaps
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> depth_stencil_view_descriptor_heap;
-	unsigned depth_stencil_view_descriptor_size;
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC depth_stencil_view_descriptor_heap_desc_d3d12 = {};
-		depth_stencil_view_descriptor_heap_desc_d3d12.NumDescriptors = k_back_buffer_count + 16; // TODO: Hardcoded
-		depth_stencil_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		depth_stencil_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-		hr = device->CreateDescriptorHeap(&depth_stencil_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&depth_stencil_view_descriptor_heap));
-		assert(SUCCEEDED(hr));
-
-		depth_stencil_view_descriptor_heap->SetName(L"DSV");
-
-		depth_stencil_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	}
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shader_resource_view_descriptor_heap;
-	unsigned shader_resource_view_descriptor_size;
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC shader_resource_view_descriptor_heap_desc_d3d12 = {};
-		shader_resource_view_descriptor_heap_desc_d3d12.NumDescriptors = 1024; // TODO: Hardcoded
-		shader_resource_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		shader_resource_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-		hr = device->CreateDescriptorHeap(&shader_resource_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&shader_resource_view_descriptor_heap));
-		assert(SUCCEEDED(hr));
-
-		depth_stencil_view_descriptor_heap->SetName(L"CBV_SRV_UAV");
-
-		shader_resource_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	}
-
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shader_resource_view_shader_visible_descriptor_heap;
-	unsigned shader_resource_view_shader_visible_descriptor_size;
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC shader_resource_view_descriptor_heap_desc_d3d12 = {};
-		shader_resource_view_descriptor_heap_desc_d3d12.NumDescriptors = 32; // TODO: Hardcoded
-		shader_resource_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		shader_resource_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-		hr = device->CreateDescriptorHeap(&shader_resource_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&shader_resource_view_shader_visible_descriptor_heap));
-		assert(SUCCEEDED(hr));
-
-		depth_stencil_view_descriptor_heap->SetName(L"CBV_SRV_UAV (SHADER_VISIBLE)");
-
-		shader_resource_view_shader_visible_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	}
 
 	/*
 	Root Signature defines the number of arguments and their types :
@@ -279,19 +220,12 @@ void sp_init(const sp_window& window)
 	_sp._device = device;
 	_sp._swap_chain = swap_chain3;
 	_sp._graphics_queue = graphics_queue;
-	_sp._depth_stencil_view_descriptor_heap = depth_stencil_view_descriptor_heap;
-	_sp._depth_stencil_view_descriptor_size = depth_stencil_view_descriptor_size;
-	_sp._depth_stencil_view_cpu_descriptor_handle.InitOffsetted(depth_stencil_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
-	_sp._shader_resource_view_descriptor_heap = shader_resource_view_descriptor_heap;
-	_sp._shader_resource_view_descriptor_size = shader_resource_view_descriptor_size;
-	_sp._shader_resource_view_cpu_descriptor_handle.InitOffsetted(shader_resource_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
-	_sp._shader_resource_view_shader_visible_descriptor_heap = shader_resource_view_shader_visible_descriptor_heap;
-	_sp._shader_resource_view_shader_visible_descriptor_size = shader_resource_view_shader_visible_descriptor_size;
-	_sp._shader_resource_view_cpu_shader_visible_descriptor_handle.InitOffsetted(shader_resource_view_shader_visible_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
-	_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.InitOffsetted(shader_resource_view_shader_visible_descriptor_heap->GetGPUDescriptorHandleForHeapStart(), 0);
 	_sp._root_signature = root_signature;
 
-	_sp._descriptor_heap_rtv = sp_descriptor_heap_create("rtv", { 64, sp_descriptor_heap_usage::staging, sp_descriptor_heap_type::rtv });
+	_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
+	_sp._descriptor_heap_rtv_cpu = sp_descriptor_heap_create("rtv_cpu", { 64, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::rtv });
+	_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 1024, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
+	_sp._descriptor_heap_cbv_srv_uav_gpu = sp_descriptor_heap_create("cbv_srv_uav_gpu", { 32, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
 
 	detail::sp_texture_pool_create();
 	detail::sp_vertex_buffer_pool_create();
@@ -310,7 +244,7 @@ void sp_init(const sp_window& window)
 		hr = swap_chain3->GetDesc1(&swap_chain_desc);
 		assert(SUCCEEDED(hr));
 
-		texture._name = "swap_chain_buffer";
+		texture._name = "swap_chain";
 		texture._width = swap_chain_desc.Width;
 		texture._height = swap_chain_desc.Height;
 
@@ -319,7 +253,7 @@ void sp_init(const sp_window& window)
 		hr = swap_chain3->GetBuffer(back_buffer_index, IID_PPV_ARGS(&texture._resource));
 		assert(SUCCEEDED(hr));
 
-		texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv);
+		texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
 		device->CreateRenderTargetView(texture._resource.Get(), nullptr, texture._render_target_view._handle_cpu_d3d12);
 	}
 }
