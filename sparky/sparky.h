@@ -3,6 +3,7 @@
 #include "command_list.h"
 #include "constant_buffer.h"
 #include "pipeline.h"
+#include "descriptor.h"
 #include "d3dx12.h"
 
 #if SP_DEBUG_RENDERDOC_HOOK_ENABLED
@@ -13,7 +14,6 @@
 #include <d3d12.h>
 #include <dxgi1_3.h>
 #include <dxgi1_4.h>
-#include <D3Dcompiler.h>
 
 #include <array>
 
@@ -26,9 +26,7 @@ struct sp
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _render_target_view_descriptor_heap;
-	unsigned _render_target_view_descriptor_size;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE _render_target_view_cpu_descriptor_handle;
+	sp_descriptor_heap _descriptor_heap_rtv;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _depth_stencil_view_descriptor_heap;
 	unsigned _depth_stencil_view_descriptor_size;
@@ -180,22 +178,6 @@ void sp_init(const sp_window& window)
 	assert(SUCCEEDED(hr));
 
 	// TODO: Wrap heaps
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> render_target_view_descriptor_heap;
-	unsigned render_target_view_descriptor_size;
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC render_target_view_descriptor_heap_desc_d3d12 = {};
-		render_target_view_descriptor_heap_desc_d3d12.NumDescriptors = k_back_buffer_count + 16; // TODO: Hardcoded
-		render_target_view_descriptor_heap_desc_d3d12.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		render_target_view_descriptor_heap_desc_d3d12.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-		hr = device->CreateDescriptorHeap(&render_target_view_descriptor_heap_desc_d3d12, IID_PPV_ARGS(&render_target_view_descriptor_heap));
-		assert(SUCCEEDED(hr));
-
-		render_target_view_descriptor_heap->SetName(L"RTV");
-
-		render_target_view_descriptor_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	}
-
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> depth_stencil_view_descriptor_heap;
 	unsigned depth_stencil_view_descriptor_size;
 	{
@@ -297,9 +279,6 @@ void sp_init(const sp_window& window)
 	_sp._device = device;
 	_sp._swap_chain = swap_chain3;
 	_sp._graphics_queue = graphics_queue;
-	_sp._render_target_view_descriptor_heap = render_target_view_descriptor_heap;
-	_sp._render_target_view_descriptor_size = render_target_view_descriptor_size;
-	_sp._render_target_view_cpu_descriptor_handle.InitOffsetted(render_target_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
 	_sp._depth_stencil_view_descriptor_heap = depth_stencil_view_descriptor_heap;
 	_sp._depth_stencil_view_descriptor_size = depth_stencil_view_descriptor_size;
 	_sp._depth_stencil_view_cpu_descriptor_handle.InitOffsetted(depth_stencil_view_descriptor_heap->GetCPUDescriptorHandleForHeapStart(), 0);
@@ -312,6 +291,8 @@ void sp_init(const sp_window& window)
 	_sp._shader_resource_view_gpu_shader_visible_descriptor_handle.InitOffsetted(shader_resource_view_shader_visible_descriptor_heap->GetGPUDescriptorHandleForHeapStart(), 0);
 	_sp._root_signature = root_signature;
 
+	_sp._descriptor_heap_rtv = sp_descriptor_heap_create("rtv", { 64, sp_descriptor_heap_usage::staging, sp_descriptor_heap_type::rtv });
+
 	detail::sp_texture_pool_create();
 	detail::sp_vertex_buffer_pool_create();
 	detail::sp_graphics_pipeline_state_pool_create();
@@ -322,7 +303,6 @@ void sp_init(const sp_window& window)
 	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; ++back_buffer_index)
 	{
 		// TODO: sp_texture_create_from_swap_chain?
-
 		_sp._back_buffer_texture_handles[back_buffer_index] = detail::sp_texture_handle_alloc();
 		sp_texture& texture = detail::sp_texture_pool_get(_sp._back_buffer_texture_handles[back_buffer_index]);
 
@@ -339,9 +319,8 @@ void sp_init(const sp_window& window)
 		hr = swap_chain3->GetBuffer(back_buffer_index, IID_PPV_ARGS(&texture._resource));
 		assert(SUCCEEDED(hr));
 
-		device->CreateRenderTargetView(texture._resource.Get(), nullptr, _sp._render_target_view_cpu_descriptor_handle);
-		texture._render_target_view = _sp._render_target_view_cpu_descriptor_handle;
-		_sp._render_target_view_cpu_descriptor_handle.Offset(1, _sp._render_target_view_descriptor_size);
+		texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv);
+		device->CreateRenderTargetView(texture._resource.Get(), nullptr, texture._render_target_view._handle_cpu_d3d12);
 	}
 }
 

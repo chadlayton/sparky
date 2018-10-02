@@ -147,6 +147,8 @@
     <ClInclude Include="command_list.h" />
     <ClInclude Include="constant_buffer.h" />
     <ClInclude Include="constant_buffer_impl.h" />
+    <ClInclude Include="descriptor.h" />
+    <ClInclude Include="descriptor_impl.h" />
     <ClInclude Include="handle.h" />
     <ClInclude Include="math.h" />
     <ClInclude Include="pipeline.h" />

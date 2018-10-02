@@ -14,22 +14,22 @@ struct sp_handle
 
 struct sp_handle_pool
 {
-	short count = 0;
-	short capacity = 0;
-	sp_handle* dense = nullptr;
-	sp_handle* sparse = nullptr;
+	short _count = 0;
+	short _capacity = 0;
+	sp_handle* _dense = nullptr;
+	sp_handle* _sparse = nullptr;
 };
 
 void sp_handle_pool_create(sp_handle_pool* handle_pool, int capacity)
 {
 	assert(capacity < SHORT_MAX && "capacity too large");
 
-	handle_pool->dense = new sp_handle[capacity];
-	handle_pool->sparse = new sp_handle[capacity];
-	handle_pool->capacity = capacity;
-	handle_pool->count = 0;
+	handle_pool->_dense = new sp_handle[capacity];
+	handle_pool->_sparse = new sp_handle[capacity];
+	handle_pool->_capacity = capacity;
+	handle_pool->_count = 0;
 
-	sp_handle* dense = handle_pool->dense;
+	sp_handle* dense = handle_pool->_dense;
 	for (int i = 0; i < capacity; i++)
 	{
 		dense[i].index = i;
@@ -40,14 +40,14 @@ void sp_handle_pool_destroy(sp_handle_pool* pool)
 {
 	if (pool) 
 	{
-		delete[] pool->dense;
-		pool->dense = nullptr;
+		delete[] pool->_dense;
+		pool->_dense = nullptr;
 
-		delete[] pool->sparse;
-		pool->sparse = nullptr;
+		delete[] pool->_sparse;
+		pool->_sparse = nullptr;
 
-		pool->count = 0;
-		pool->capacity = 0;
+		pool->_count = 0;
+		pool->_capacity = 0;
 	}
 }
 
@@ -55,11 +55,11 @@ sp_handle sp_handle_alloc(sp_handle_pool* pool)
 {
 	sp_handle handle;
 
-	if (pool->count < pool->capacity) 
+	if (pool->_count < pool->_capacity) 
 	{
-		handle = pool->dense[pool->count];
-		pool->sparse[handle.index] = { pool->count };
-		++pool->count;
+		handle = pool->_dense[pool->_count];
+		pool->_sparse[handle.index] = { pool->_count };
+		++pool->_count;
 	}
 	else 
 	{
@@ -71,22 +71,22 @@ sp_handle sp_handle_alloc(sp_handle_pool* pool)
 
 void sp_handle_free(sp_handle_pool* pool, sp_handle handle)
 {
-	assert(pool->count > 0 && "handle pool is empty");
+	assert(pool->_count > 0 && "handle pool is empty");
 
-	--pool->count;
-	sp_handle dense_handle = pool->dense[pool->count];
-	sp_handle sparse_handle = pool->sparse[handle.index];
-	pool->dense[pool->count] = handle;
-	pool->sparse[dense_handle.index] = sparse_handle;
-	pool->dense[sparse_handle.index] = dense_handle;
+	--pool->_count;
+	sp_handle dense_handle = pool->_dense[pool->_count];
+	sp_handle sparse_handle = pool->_sparse[handle.index];
+	pool->_dense[pool->_count] = handle;
+	pool->_sparse[dense_handle.index] = sparse_handle;
+	pool->_dense[sparse_handle.index] = dense_handle;
 }
 
-void sp_handle_pool_clear(sp_handle_pool* pool)
+void sp_handle_pool_reset(sp_handle_pool* pool)
 {
-	sp_handle* dense = pool->dense;
-	for (int i = 0; i < pool->capacity; i++)
+	sp_handle* dense = pool->_dense;
+	for (int i = 0; i < pool->_capacity; i++)
 	{
 		dense[i].index = i;
 	}
-	pool->count = 0;
+	pool->_count = 0;
 }

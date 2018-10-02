@@ -1,15 +1,13 @@
 #pragma once
 
-#include <array>
+#include "handle.h"
+#include "d3dx12.h"
+#include "descriptor.h"
+
 #include <vector>
 
 #include <wrl.h>
-
 #include <d3d12.h>
-
-#include "d3dx12.h"
-
-#include "handle.h"
 
 enum class sp_texture_format
 {
@@ -33,7 +31,7 @@ struct sp_texture
 	int _height;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE _render_target_view;
+	sp_descriptor_handle _render_target_view;
 	D3D12_CPU_DESCRIPTOR_HANDLE _shader_resource_view;
 	D3D12_CPU_DESCRIPTOR_HANDLE _depth_stencil_view;
 

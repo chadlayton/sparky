@@ -54,6 +54,12 @@
     <ClInclude Include="shader_impl.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="descriptor.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptor_impl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="command_list_impl.h">

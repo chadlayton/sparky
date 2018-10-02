@@ -1,9 +1,9 @@
 #pragma once
 
 #include "command_list.h"
-
-#include "sparky.h"
 #include "vertex_buffer.h"
+
+#include <codecvt>
 
 sp_graphics_command_list sp_graphics_command_list_create(const char* name, const sp_graphics_command_list_desc& desc)
 {
@@ -120,7 +120,7 @@ void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& comma
 	{
 		const sp_texture& texture = detail::sp_texture_pool_get(render_target_handles[i]);
 
-		render_target_views[i] = texture._render_target_view;
+		render_target_views[i] = texture._render_target_view._handle_cpu_d3d12;
 	}
 
 	// XXX: How do I track previous state? I can't put it on the resource itself because we might be touching it from multiple threads.

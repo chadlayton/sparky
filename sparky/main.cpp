@@ -18,6 +18,7 @@
 #include "texture_impl.h"
 #include "vertex_buffer_impl.h"
 #include "shader_impl.h"
+#include "descriptor_impl.h"
 
 #include <string>
 #include <cassert>

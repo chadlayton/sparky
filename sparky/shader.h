@@ -2,8 +2,6 @@
 
 #include "handle.h"
 
-#include <codecvt>
-
 #include <wrl.h>
 #include <d3d12.h>
 

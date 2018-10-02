@@ -1,12 +1,11 @@
 #pragma once
 
-#include <array>
-
-#include "d3dx12.h"
+#include "handle.h"
+#include "pipeline.h"
+#include "command_list.h"
 
 #include <d3d12.h>
-
-#include "pipeline.h"
+#include <wrl.h>
 
 struct sp_graphics_command_list_desc
 {
