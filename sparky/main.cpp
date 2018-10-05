@@ -58,11 +58,17 @@ int main()
 	const int window_height = 720;
 	const float aspect_ratio = window_width / static_cast<float>(window_height);
 
-	sp_window window = sp_window_create(L"demo", window_width, window_height);
+	camera camera{ { 0, 0, -10 }, {0, 0, 0} };
+
+	sp_window window = sp_window_create("demo", {
+		window_width,
+		window_height,
+		[](char key) {
+			static int x = 0;
+			++x;
+		} });
 
 	sp_init(window);
-
-	camera camera{ { 0, 0, -10 }, {0, 0, 0} };
 
 	math::mat<4> view_matrix = math::inverse(camera_get_transform(camera));
 	math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
@@ -225,6 +231,8 @@ int main()
 	sp_device_wait_for_idle();
 
 	sp_shutdown();
+
+	sp_window_destroy(&window);
 
 	return 0;
 }
