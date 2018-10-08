@@ -58,22 +58,32 @@ int main()
 	const int window_height = 720;
 	const float aspect_ratio = window_width / static_cast<float>(window_height);
 
-	camera camera{ { 0, 0, -10 }, {0, 0, 0} };
+	camera cam{ { 0, 0, -10 }, {0, 0, 0} };
 
 	sp_window window = sp_window_create("demo", {
 		window_width,
 		window_height,
-		[](char key) {
-			static int x = 0;
-			++x;
+		&cam,
+		[](void* user_data, char key) {
+			if (key == 'W')
+			{
+				static_cast<camera*>(user_data)->position.z += 0.1f;
+			}
+			if (key == 'S')
+			{
+				static_cast<camera*>(user_data)->position.z -= 0.1f;
+			}
+			if (key == 'A')
+			{
+				static_cast<camera*>(user_data)->position.x -= 0.1f;
+			}
+			if (key == 'D')
+			{
+				static_cast<camera*>(user_data)->position.x += 0.1f;
+			}
 		} });
 
 	sp_init(window);
-
-	math::mat<4> view_matrix = math::inverse(camera_get_transform(camera));
-	math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
-	math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
-	math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
 	int frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 
@@ -116,12 +126,7 @@ int main()
 
 	} constant_buffer_per_frame_data;
 
-	constant_buffer_per_frame_data.projection_matrix = projection_matrix;
-	constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
-	constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
-
 	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) } );
-	sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
 
 	sp_graphics_command_list command_list = sp_graphics_command_list_create("main", { gbuffer_pipeline_state_handle });
 
@@ -161,6 +166,20 @@ int main()
 
 	while (sp_window_poll())
 	{
+		math::mat<4> camera_transform = camera_get_transform(cam);
+
+		//math::mat<4> view_matrix = math::create_look_at_lh(cam.position + math::get_forward(camera_transform), cam.position, math::get_up(camera_transform));
+		math::mat<4> view_matrix = math::inverse(camera_transform);
+		math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
+		math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
+		math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
+
+		constant_buffer_per_frame_data.projection_matrix = projection_matrix;
+		constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
+		constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
+
+		sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
+
 		// Record all the commands we need to render the scene into the command list.
 		{
 			sp_graphics_command_list_get_impl(command_list)->SetGraphicsRootSignature(_sp._root_signature.Get());
@@ -178,6 +197,8 @@ int main()
 			};
 			sp_graphics_command_list_set_render_targets(command_list, gbuffer_render_target_handles, static_cast<int>(std::size(gbuffer_render_target_handles)), gbuffer_depth_texture_handle);
 
+			FLOAT clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			sp_graphics_command_list_get_impl(command_list)->ClearRenderTargetView(detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._render_target_view._handle_cpu_d3d12, clear_color, 0, nullptr);
 			sp_graphics_command_list_get_impl(command_list)->ClearDepthStencilView(detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
 
 			// XXX: This could all be baked per-draw call

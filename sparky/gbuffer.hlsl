@@ -32,8 +32,8 @@ vs_output vs_main(vs_input input)
 
 	vs_output output;
 
-	output.position_cs = mul(world_view_projection_matrix, float4(input.position_os, 1.0f));
-	output.normal_ws = mul(world_view_projection_matrix, float4(input.normal_os, 0.0f));
+	output.position_cs = mul(float4(input.position_os, 1.0f), world_view_projection_matrix);
+	output.normal_ws = mul(float4(input.normal_os, 0.0f), world_view_projection_matrix);
 	output.texcoord = input.texcoord;
 	output.color = input.color;
 

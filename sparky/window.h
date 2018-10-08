@@ -2,10 +2,11 @@
 
 #include <windows.h>
 
-typedef void(*sp_window_keyboard_event_cb)(char key);
+typedef void(*sp_window_keyboard_event_cb)(void* user_data, char key);
 
 struct sp_window_event_callbacks
 {
+	void* user_data = nullptr;
 	sp_window_keyboard_event_cb keyboard;
 };
 
@@ -39,7 +40,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_KEYDOWN:
 		if (const sp_window_event_callbacks* callbacks = reinterpret_cast<sp_window_event_callbacks*>(GetWindowLongPtr(hWnd, GWLP_USERDATA)))
 		{
-			(*callbacks->keyboard)(static_cast<char>(wParam));
+			(*callbacks->keyboard)(callbacks->user_data, static_cast<char>(wParam));
 		}
 		break;
 	case WM_KEYUP:
