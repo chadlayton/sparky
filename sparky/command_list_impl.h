@@ -48,11 +48,6 @@ void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list)
 	command_list._command_allocator_d3d12.Reset();
 }
 
-ID3D12GraphicsCommandList* sp_graphics_command_list_get_impl(const sp_graphics_command_list& command_list)
-{
-	return command_list._command_list_d3d12.Get();
-}
-
 void sp_graphics_command_list_reset(sp_graphics_command_list& command_list)
 {
 	HRESULT hr = command_list._command_allocator_d3d12->Reset();
@@ -171,24 +166,32 @@ void sp_graphics_command_list_close(sp_graphics_command_list& command_list)
 	assert(SUCCEEDED(hr));
 }
 
-struct sp_viewport
-{
-	float x, y, width, height;
-	float depth_min = 0.0f;
-	float depth_max = 1.0f;
-};
-
 void sp_graphics_command_list_set_viewport(sp_graphics_command_list& command_list, const sp_viewport& viewport)
 {
 	command_list._command_list_d3d12->RSSetViewports(1, &CD3DX12_VIEWPORT(viewport.x, viewport.y, viewport.width, viewport.height, viewport.depth_min, viewport.depth_max));
 }
 
-struct sp_scissor_rect
-{
-	int x, y, width, height;
-};
-
 void sp_graphics_command_list_set_scissor_rect(sp_graphics_command_list& command_list, const sp_scissor_rect& scissor)
 {
 	command_list._command_list_d3d12->RSSetScissorRects(1, &CD3DX12_RECT(scissor.x, scissor.y, scissor.x + scissor.width, scissor.y + scissor.height));
+}
+
+void sp_graphics_command_list_clear_render_target(sp_graphics_command_list& command_list, sp_texture_handle render_target_handle, std::array<float, 4> color)
+{
+	command_list._command_list_d3d12->ClearRenderTargetView(detail::sp_texture_pool_get(render_target_handle)._render_target_view._handle_cpu_d3d12, &color[0], 0, nullptr);
+}
+
+void sp_graphics_command_list_clear_depth_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle, float depth, int stencil)
+{
+	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0, nullptr);
+}
+
+void sp_graphics_command_list_clear_depth(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle, float depth)
+{
+	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
+}
+
+void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle, int stencil)
+{
+	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_STENCIL, 0.0f, stencil, 0, nullptr);
 }
