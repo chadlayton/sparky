@@ -30,11 +30,33 @@
 #include <windows.h>
 #include <wrl.h>
 #include <shellapi.h>
-#include <DirectXMath.h>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+
+struct input
+{
+	struct state
+	{
+		bool keys[256];
+
+		struct
+		{
+			bool is_in_client_area;
+			int x;
+			int y;
+		} mouse;
+	};
+
+	state current;
+	state previous;
+};
+
+void input_update(input* input)
+{
+	memcpy(&input->previous, &input->current, sizeof(input::state));
+}
 
 struct camera
 {
@@ -46,10 +68,38 @@ math::mat<4> camera_get_transform(const camera& camera)
 {
 	math::mat<4> transform = math::create_identity<4>();
 	transform = math::multiply(transform, math::create_rotation_x(camera.rotation.x));
-	transform = math::multiply(transform, math::create_rotation_x(camera.rotation.y));
-	transform = math::multiply(transform, math::create_rotation_x(camera.rotation.z));
+	transform = math::multiply(transform, math::create_rotation_y(camera.rotation.y));
+	transform = math::multiply(transform, math::create_rotation_z(camera.rotation.z));
 	math::set_translation(transform, camera.position);
 	return transform;
+}
+
+void camera_update(camera* camera, const input& input)
+{
+	const math::mat<4> camera_transform = camera_get_transform(*camera);
+
+	if (input.current.keys['A'])
+	{
+		camera->position -= math::get_right(camera_transform) * 0.1f;
+	}
+	if (input.current.keys['D'])
+	{
+		camera->position += math::get_right(camera_transform) * 0.1f;
+	}
+	if (input.current.keys['W'])
+	{
+		camera->position += math::get_forward(camera_transform) * 0.1f;
+	}
+	if (input.current.keys['S'])
+	{
+		camera->position -= math::get_forward(camera_transform) * 0.1f;
+	}
+
+	if (input.current.keys[VK_LBUTTON] && input.current.mouse.is_in_client_area && input.previous.mouse.is_in_client_area)
+	{
+		camera->rotation.y -= (input.current.mouse.x - input.previous.mouse.x) * 0.01f;
+		camera->rotation.x += (input.current.mouse.y - input.previous.mouse.y) * 0.01f;
+	}
 }
 
 int main()
@@ -58,30 +108,31 @@ int main()
 	const int window_height = 720;
 	const float aspect_ratio = window_width / static_cast<float>(window_height);
 
-	camera cam{ { 0, 0, -10 }, {0, 0, 0} };
+	camera camera{ { 0, 0, -10 }, {0, 0, 0} };
 
-	sp_window window = sp_window_create("demo", {
-		window_width,
-		window_height,
-		&cam,
+	input input{ 0 };
+
+	sp_window_event_set_key_down_callback(
 		[](void* user_data, char key) {
-			if (key == 'W')
-			{
-				static_cast<camera*>(user_data)->position.z += 0.1f;
-			}
-			if (key == 'S')
-			{
-				static_cast<camera*>(user_data)->position.z -= 0.1f;
-			}
-			if (key == 'A')
-			{
-				static_cast<camera*>(user_data)->position.x -= 0.1f;
-			}
-			if (key == 'D')
-			{
-				static_cast<camera*>(user_data)->position.x += 0.1f;
-			}
-		} });
+			static_cast<input::state*>(user_data)->keys[key] = true;
+		},
+		&input.current);
+
+	sp_window_event_set_key_up_callback(
+		[](void* user_data, char key) {
+			static_cast<input::state*>(user_data)->keys[key] = false;
+		},
+		&input.current);
+
+	sp_window_event_set_mouse_move_callback(
+		[](void* user_data, int x, int y) {
+			static_cast<input::state*>(user_data)->mouse.is_in_client_area = true;
+			static_cast<input::state*>(user_data)->mouse.x = x;
+			static_cast<input::state*>(user_data)->mouse.y = y;
+		},
+		&input.current);
+
+	sp_window window = sp_window_create("demo", { window_width, window_height });
 
 	sp_init(window);
 
@@ -91,20 +142,20 @@ int main()
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "gbuffer.hlsl" });
 
 	sp_graphics_pipeline_state_handle gbuffer_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer", {
-		gbuffer_vertex_shader_handle, 
-		gbuffer_pixel_shader_handle, 
-		{ 
+		gbuffer_vertex_shader_handle,
+		gbuffer_pixel_shader_handle,
+		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT },
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT } 
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT }
 		},
 		{
 			DXGI_FORMAT_R8G8B8A8_UNORM,
 			DXGI_FORMAT_R8G8B8A8_UNORM,
 		},
 		sp_texture_format::d32
-	});
+		});
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "lighting.hlsl" });
@@ -116,7 +167,7 @@ int main()
 		{
 			DXGI_FORMAT_R8G8B8A8_UNORM,
 		},
-	});
+		});
 
 	__declspec(align(16)) struct
 	{
@@ -126,7 +177,7 @@ int main()
 
 	} constant_buffer_per_frame_data;
 
-	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) } );
+	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) });
 
 	sp_graphics_command_list command_list = sp_graphics_command_list_create("main", { gbuffer_pipeline_state_handle });
 
@@ -146,10 +197,10 @@ int main()
 	{
 		struct vertex
 		{
-			DirectX::XMFLOAT3 position;
-			DirectX::XMFLOAT3 normal;
-			DirectX::XMFLOAT2 texcoord;
-			DirectX::XMFLOAT4 color;
+			math::vec<3> position;
+			math::vec<3> normal;
+			math::vec<2> texcoord;
+			math::vec<4> color;
 		};
 
 		// XXX: There's no model/world transform yet so vertices are in world space
@@ -166,19 +217,21 @@ int main()
 
 	while (sp_window_poll())
 	{
-		math::mat<4> camera_transform = camera_get_transform(cam);
+		camera_update(&camera, input);
 
-		//math::mat<4> view_matrix = math::create_look_at_lh(cam.position + math::get_forward(camera_transform), cam.position, math::get_up(camera_transform));
-		math::mat<4> view_matrix = math::inverse(camera_transform);
-		math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
-		math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
-		math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
+		{
+			const math::mat<4> camera_transform = camera_get_transform(camera);
+			const math::mat<4> view_matrix = math::inverse(camera_transform);
+			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
+			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
+			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
-		constant_buffer_per_frame_data.projection_matrix = projection_matrix;
-		constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
-		constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
+			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
+			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
+			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
-		sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
+			sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
+		}
 
 		// Record all the commands we need to render the scene into the command list.
 		{
@@ -247,13 +300,13 @@ int main()
 		sp_graphics_command_list_reset(command_list, gbuffer_pipeline_state_handle);
 
 		frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
+
+		input_update(&input);
 	}
 
 	sp_device_wait_for_idle();
 
 	sp_shutdown();
-
-	sp_window_destroy(&window);
 
 	return 0;
 }
