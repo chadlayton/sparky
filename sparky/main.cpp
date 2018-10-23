@@ -31,6 +31,11 @@
 #include <wrl.h>
 #include <shellapi.h>
 
+#include <fx/gltf.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -78,21 +83,23 @@ void camera_update(camera* camera, const input& input)
 {
 	const math::mat<4> camera_transform = camera_get_transform(*camera);
 
+	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 10.0f : 1.0f;
+
 	if (input.current.keys['A'])
 	{
-		camera->position -= math::get_right(camera_transform) * 0.1f;
+		camera->position -= math::get_right(camera_transform) * 0.1f * movement_speed_mod;
 	}
 	if (input.current.keys['D'])
 	{
-		camera->position += math::get_right(camera_transform) * 0.1f;
+		camera->position += math::get_right(camera_transform) * 0.1f * movement_speed_mod;
 	}
 	if (input.current.keys['W'])
 	{
-		camera->position += math::get_forward(camera_transform) * 0.1f;
+		camera->position += math::get_forward(camera_transform) * 0.1f * movement_speed_mod;
 	}
 	if (input.current.keys['S'])
 	{
-		camera->position -= math::get_forward(camera_transform) * 0.1f;
+		camera->position -= math::get_forward(camera_transform) * 0.1f * movement_speed_mod;
 	}
 
 	if (input.current.keys[VK_LBUTTON] && input.current.mouse.is_in_client_area && input.previous.mouse.is_in_client_area)
@@ -100,6 +107,195 @@ void camera_update(camera* camera, const input& input)
 		camera->rotation.y -= (input.current.mouse.x - input.previous.mouse.x) * 0.01f;
 		camera->rotation.x += (input.current.mouse.y - input.previous.mouse.y) * 0.01f;
 	}
+}
+
+struct sp_model
+{
+	struct mesh
+	{
+		int vertex_count;
+		sp_vertex_buffer_handle vertex_buffer;
+		int base_color_texture_index;
+	};
+
+	std::vector<mesh> meshes;
+	std::vector<sp_texture_handle> textures;
+};
+
+namespace detail
+{
+	int sp_fx_get_accessor_stride_bytes(const fx::gltf::Accessor& accessor)
+	{
+		int element_size_bytes = 0;
+		switch (accessor.componentType)
+		{
+		case fx::gltf::Accessor::ComponentType::Byte:
+		case fx::gltf::Accessor::ComponentType::UnsignedByte:
+			element_size_bytes = 1;
+			break;
+		case fx::gltf::Accessor::ComponentType::Short:
+		case fx::gltf::Accessor::ComponentType::UnsignedShort:
+			element_size_bytes = 2;
+			break;
+		case fx::gltf::Accessor::ComponentType::Float:
+		case fx::gltf::Accessor::ComponentType::UnsignedInt:
+			element_size_bytes = 4;
+			break;
+		}
+
+		int element_count = 0;
+		switch (accessor.type)
+		{
+		case fx::gltf::Accessor::Type::Mat2:
+			element_count = 4;
+			break;
+		case fx::gltf::Accessor::Type::Mat3:
+			element_count = 9;
+			break;
+		case fx::gltf::Accessor::Type::Mat4:
+			element_count = 16;
+			break;
+		case fx::gltf::Accessor::Type::Scalar:
+			element_count = 1;
+			break;
+		case fx::gltf::Accessor::Type::Vec2:
+			element_count = 2;
+			break;
+		case fx::gltf::Accessor::Type::Vec3:
+			element_count = 3;
+			break;
+		case fx::gltf::Accessor::Type::Vec4:
+			element_count = 4;
+			break;
+		}
+
+		return element_size_bytes * element_count;
+	}
+
+	template <typename T>
+	const std::vector<T> sp_fx_get_buffer_data(const fx::gltf::Document& doc, const fx::gltf::Accessor& accessor)
+	{
+		const auto& buffer_view = doc.bufferViews[accessor.bufferView];
+		const auto& buffer = doc.buffers[buffer_view.buffer];
+
+		const int stride_bytes = sp_fx_get_accessor_stride_bytes(accessor);
+
+		assert(stride_bytes == sizeof(T));
+		assert(buffer_view.byteStride == 0 || buffer_view.byteStride == sizeof(T));
+
+		std::vector<T> data(accessor.count);
+
+		std::memcpy(data.data(), &buffer.data[buffer_view.byteOffset + accessor.byteOffset], accessor.count * stride_bytes);
+
+		return data;
+	}
+}
+
+sp_model sp_model_create_from_gltf(const char* path)
+{
+	sp_model model;
+
+	fx::gltf::Document doc_fx = fx::gltf::LoadFromText(path);
+
+	model.textures.reserve(doc_fx.textures.size());
+
+	for (const auto& texture_fx : doc_fx.textures)
+	{
+		std::vector<uint8_t> image_data;
+
+		const fx::gltf::Image& image_fx = doc_fx.images[texture_fx.source];
+
+		if (!image_fx.uri.empty() && !image_fx.IsEmbeddedResource())
+		{
+			std::string image_path = fx::gltf::detail::GetDocumentRootPath(path) + "/" + image_fx.uri;
+			
+			int image_width, image_height, image_channels;
+			stbi_uc* image_data = stbi_load(image_path.c_str(), &image_width, &image_height, &image_channels, STBI_rgb_alpha);
+			assert(image_data);
+			
+			sp_texture_handle texture_handle = sp_texture_create(image_fx.name.c_str(), { image_width, image_height, sp_texture_format::r8g8b8a8 });
+			sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
+			
+			stbi_image_free(image_data);
+
+			model.textures.push_back(texture_handle);
+		}
+		else
+		{
+			assert(false);
+		}
+	}
+
+	for (const auto& mesh_fx : doc_fx.meshes)
+	{
+		for (const auto& primitive_gltf : mesh_fx.primitives)
+		{
+			std::vector<unsigned> indices = detail::sp_fx_get_buffer_data<unsigned>(doc_fx, doc_fx.accessors[primitive_gltf.indices]);
+
+			std::vector<math::vec<3>> positions;
+			std::vector<math::vec<3>> normals;
+			std::vector<math::vec<4>> tangents;
+			std::vector<math::vec<2>> texcoords;
+
+			for (const auto& attrib_fx : primitive_gltf.attributes)
+			{
+				if (attrib_fx.first == "POSITION")
+				{
+					positions = detail::sp_fx_get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+				}
+				else if (attrib_fx.first == "NORMAL")
+				{
+					normals = detail::sp_fx_get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+				}
+				else if (attrib_fx.first == "TANGENT")
+				{
+					tangents = detail::sp_fx_get_buffer_data<math::vec<4>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+				}
+				else if (attrib_fx.first == "TEXCOORD_0")
+				{
+					texcoords = detail::sp_fx_get_buffer_data<math::vec<2>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+				}
+			}
+
+			if (texcoords.empty())
+			{
+				continue;
+			}
+
+			math::vec<4> color = { static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX), 1.0f };
+
+			struct vertex
+			{
+				math::vec<3> position;
+				math::vec<3> normal;
+				math::vec<2> texcoord;
+				math::vec<4> color;
+			};
+
+			std::vector<vertex> vertices(indices.size());
+
+			for (const auto& index : indices)
+			{
+				vertices.push_back({ positions[index], normals[index], texcoords[index], color });
+			}
+
+			sp_model::mesh mesh;
+			
+			mesh.vertex_buffer = sp_vertex_buffer_create(mesh_fx.name.c_str(), { static_cast<int>(vertices.size() * sizeof(vertex)), static_cast<int>(sizeof(vertex)) });
+			sp_vertex_buffer_update(mesh.vertex_buffer, vertices.data(), static_cast<int>(vertices.size() * sizeof(vertex)));
+			mesh.vertex_count = static_cast<int>(vertices.size());
+			mesh.base_color_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.baseColorTexture.index;
+
+			if (mesh.base_color_texture_index < 0)
+			{
+				continue;
+			}
+
+			model.meshes.push_back(mesh);
+		}
+	}
+
+	return model;
 }
 
 int main()
@@ -155,7 +351,9 @@ int main()
 			DXGI_FORMAT_R8G8B8A8_UNORM,
 		},
 		sp_texture_format::d32
-		});
+	});
+
+	sp_model model = sp_model_create_from_gltf("littlest_tokyo/scene.gltf");
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "lighting.hlsl" });
@@ -222,7 +420,7 @@ int main()
 		{
 			const math::mat<4> camera_transform = camera_get_transform(camera);
 			const math::mat<4> view_matrix = math::inverse(camera_transform);
-			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 100.0f);
+			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 10000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
 			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
@@ -265,6 +463,21 @@ int main()
 			command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			sp_graphics_command_list_set_vertex_buffers(command_list, &triangle_vertex_buffer_handle, 1);
 			command_list._command_list_d3d12->DrawInstanced(3, 1, 0, 0);
+
+			for (const auto& mesh : model.meshes)
+			{
+				// XXX: This could all be baked per-draw call
+				command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+				// Copy SRV
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(model.textures[mesh.base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				// Increment to start of CBV range
+				sp_descriptor_heap_advance(&_sp._descriptor_heap_cbv_srv_uav_gpu, 11);
+				// Copy CBV
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+				sp_graphics_command_list_set_vertex_buffers(command_list, &mesh.vertex_buffer, 1);
+				command_list._command_list_d3d12->DrawInstanced(mesh.vertex_count, 1, 0, 0);
+			}
 
 			command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(lighting_pipeline_state_handle));
 

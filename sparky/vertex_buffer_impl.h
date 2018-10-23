@@ -68,7 +68,7 @@ ID3D12Resource* sp_vertex_buffer_get_impl(const sp_vertex_buffer_handle& buffer_
 	return detail::resource_pools::vertex_buffers[buffer_handle.index]._resource.Get();
 }
 
-void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, void* data_cpu, size_t size_bytes)
+void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, const void* data_cpu, int size_bytes)
 {
 	sp_vertex_buffer& buffer = detail::resource_pools::vertex_buffers[buffer_handle.index];
 

@@ -92,10 +92,10 @@ namespace detail
 	}
 }
 
-void sp_graphics_command_list_set_vertex_buffers(sp_graphics_command_list& command_list, sp_vertex_buffer_handle* vertex_buffer_handles, unsigned vertex_buffer_count)
+void sp_graphics_command_list_set_vertex_buffers(sp_graphics_command_list& command_list, const sp_vertex_buffer_handle* vertex_buffer_handles, int vertex_buffer_count)
 {
 	D3D12_VERTEX_BUFFER_VIEW vertex_buffer_views[D3D12_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	for (unsigned i = 0; i < vertex_buffer_count; ++i)
+	for (int i = 0; i < vertex_buffer_count; ++i)
 	{
 		const sp_vertex_buffer& buffer = detail::sp_vertex_buffer_pool_get(vertex_buffer_handles[i]);
 

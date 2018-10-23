@@ -40,7 +40,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_reset(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_reset(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle);
-void sp_graphics_command_list_set_vertex_buffers(sp_graphics_command_list& command_list, sp_vertex_buffer_handle* vertex_buffer_handles, unsigned vertex_buffer_count);
+void sp_graphics_command_list_set_vertex_buffers(sp_graphics_command_list& command_list, const sp_vertex_buffer_handle* vertex_buffer_handles, unsigned vertex_buffer_count);
 void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& command_list, sp_texture_handle* render_target_handles, int render_target_count, sp_texture_handle depth_stencil_handle);
 void sp_graphics_command_list_close(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_set_viewport(sp_graphics_command_list& command_list, const sp_viewport& viewport);
