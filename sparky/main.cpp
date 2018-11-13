@@ -144,9 +144,12 @@ model model_create_cube(sp_texture_handle base_color_texture_handle)
 
 	cube_vertex cube_vertices[] =
 	{
-		{ { 0.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+		{ { -5.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
 		{ { 5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+		{ { -5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+		{ { -5.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+		{ { 5.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ { 5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
 	};
 
 	mesh.vertex_buffer_handle = sp_vertex_buffer_create("cube", { sizeof(cube_vertices), sizeof(cube_vertex) });
@@ -396,7 +399,7 @@ int main()
 		sp_texture_format::d32
 	});
 
-	model scene = model_create_from_gltf("littlest_tokyo/scene.gltf");
+	//model scene = model_create_from_gltf("littlest_tokyo/scene.gltf");
 
 	std::vector<uint8_t> checkerboard_big_image_data = sp_image_checkerboard_data_create(1024, 1024);
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
@@ -477,7 +480,7 @@ int main()
 				};
 				sp_graphics_command_list_set_render_targets(command_list, gbuffer_render_target_handles, static_cast<int>(std::size(gbuffer_render_target_handles)), gbuffer_depth_texture_handle);
 
-				sp_graphics_command_list_clear_render_target(command_list, gbuffer_base_color_texture_handle, { 0.0f, 0.0f, 0.0f, 0.0f });
+				sp_graphics_command_list_clear_render_target(command_list, gbuffer_base_color_texture_handle, { 1.0f, 0.0f, 0.0f, 0.0f });
 				sp_graphics_command_list_clear_depth(command_list, gbuffer_depth_texture_handle, 1.0f);
 
 				command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
