@@ -109,7 +109,7 @@ void camera_update(camera* camera, const input& input)
 	}
 }
 
-struct sp_model
+struct model
 {
 	struct mesh
 	{
@@ -123,13 +123,13 @@ struct sp_model
 	std::vector<sp_texture_handle> textures;
 };
 
-sp_model sp_model_create_cube(sp_texture_handle base_color_texture_handle)
+model model_create_cube(sp_texture_handle base_color_texture_handle)
 {
-	sp_model model;
+	model model;
 
 	model.textures.push_back(base_color_texture_handle);
 
-	sp_model::mesh mesh;
+	model::mesh mesh;
 
 	mesh.base_color_texture_index = 0;
 	mesh.metalness_roughness_texture_index = 0;
@@ -161,7 +161,7 @@ sp_model sp_model_create_cube(sp_texture_handle base_color_texture_handle)
 
 namespace detail
 {
-	int sp_fx_get_accessor_stride_bytes(const fx::gltf::Accessor& accessor)
+	int get_accessor_stride_bytes(const fx::gltf::Accessor& accessor)
 	{
 		int element_size_bytes = 0;
 		switch (accessor.componentType)
@@ -210,12 +210,12 @@ namespace detail
 	}
 
 	template <typename T>
-	const std::vector<T> sp_fx_get_buffer_data(const fx::gltf::Document& doc, const fx::gltf::Accessor& accessor)
+	const std::vector<T> get_buffer_data(const fx::gltf::Document& doc, const fx::gltf::Accessor& accessor)
 	{
 		const auto& buffer_view = doc.bufferViews[accessor.bufferView];
 		const auto& buffer = doc.buffers[buffer_view.buffer];
 
-		const int stride_bytes = sp_fx_get_accessor_stride_bytes(accessor);
+		const int stride_bytes = get_accessor_stride_bytes(accessor);
 
 		assert(stride_bytes == sizeof(T));
 		assert(buffer_view.byteStride == 0 || buffer_view.byteStride == sizeof(T));
@@ -228,9 +228,9 @@ namespace detail
 	}
 }
 
-sp_model sp_model_create_from_gltf(const char* path)
+model model_create_from_gltf(const char* path)
 {
-	sp_model model;
+	model model;
 
 	fx::gltf::Document doc_fx = fx::gltf::LoadFromText(path);
 
@@ -267,7 +267,7 @@ sp_model sp_model_create_from_gltf(const char* path)
 	{
 		for (const auto& primitive_gltf : mesh_fx.primitives)
 		{
-			std::vector<unsigned> indices = detail::sp_fx_get_buffer_data<unsigned>(doc_fx, doc_fx.accessors[primitive_gltf.indices]);
+			std::vector<unsigned> indices = detail::get_buffer_data<unsigned>(doc_fx, doc_fx.accessors[primitive_gltf.indices]);
 
 			std::vector<math::vec<3>> positions;
 			std::vector<math::vec<3>> normals;
@@ -279,19 +279,19 @@ sp_model sp_model_create_from_gltf(const char* path)
 			{
 				if (attrib_fx.first == "POSITION")
 				{
-					positions = detail::sp_fx_get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					positions = detail::get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
 				}
 				else if (attrib_fx.first == "NORMAL")
 				{
-					normals = detail::sp_fx_get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					normals = detail::get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
 				}
 				else if (attrib_fx.first == "TANGENT")
 				{
-					tangents = detail::sp_fx_get_buffer_data<math::vec<4>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					tangents = detail::get_buffer_data<math::vec<4>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
 				}
 				else if (attrib_fx.first == "TEXCOORD_0")
 				{
-					texcoords = detail::sp_fx_get_buffer_data<math::vec<2>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					texcoords = detail::get_buffer_data<math::vec<2>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
 				}
 			}
 
@@ -317,7 +317,7 @@ sp_model sp_model_create_from_gltf(const char* path)
 				vertices.push_back({ positions[index], normals[index], texcoords[index], color });
 			}
 
-			sp_model::mesh mesh;
+			model::mesh mesh;
 			
 			mesh.vertex_buffer_handle = sp_vertex_buffer_create(mesh_fx.name.c_str(), { static_cast<int>(vertices.size() * sizeof(vertex)), static_cast<int>(sizeof(vertex)) });
 			sp_vertex_buffer_update(mesh.vertex_buffer_handle, vertices.data(), static_cast<int>(vertices.size() * sizeof(vertex)));
@@ -396,7 +396,7 @@ int main()
 		sp_texture_format::d32
 	});
 
-	sp_model scene = sp_model_create_from_gltf("littlest_tokyo/scene.gltf");
+	model scene = model_create_from_gltf("littlest_tokyo/scene.gltf");
 
 	std::vector<uint8_t> checkerboard_big_image_data = sp_image_checkerboard_data_create(1024, 1024);
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
@@ -406,7 +406,7 @@ int main()
 	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(checkerboard_small_texture_handle, &checkerboard_small_image_data[0], static_cast<int>(checkerboard_small_image_data.size()));
 
-	sp_model cube = sp_model_create_cube(checkerboard_small_texture_handle);
+	model cube = model_create_cube(checkerboard_small_texture_handle);
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "lighting.hlsl" });
@@ -436,29 +436,6 @@ int main()
 	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, sp_texture_format::r8g8b8a8 });
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, sp_texture_format::r8g8b8a8 });
 	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, sp_texture_format::d32 });
-
-	/*
-	sp_vertex_buffer_handle triangle_vertex_buffer_handle;
-	{
-		struct vertex
-		{
-			math::vec<3> position;
-			math::vec<3> normal;
-			math::vec<2> texcoord;
-			math::vec<4> color;
-		};
-
-		// XXX: There's no model/world transform yet so vertices are in world space
-		vertex triangle_vertices[] =
-		{
-			{ { 0.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -5.0f, -5.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
-		};
-
-		triangle_vertex_buffer_handle = sp_vertex_buffer_create("triangle", { sizeof(triangle_vertices), sizeof(vertex) });
-		sp_vertex_buffer_update(triangle_vertex_buffer_handle, triangle_vertices, sizeof(triangle_vertices));
-	}*/
 
 	while (sp_window_poll())
 	{
