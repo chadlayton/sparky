@@ -17,10 +17,10 @@ struct sp_input_element_desc
 
 struct sp_graphics_pipeline_state_desc
 {
-	sp_vertex_shader_handle _vertex_shader_handle;
-	sp_pixel_shader_handle _pixel_shader_handle;
-	sp_input_element_desc _input_layout[D3D12_STANDARD_VERTEX_ELEMENT_COUNT];
-	DXGI_FORMAT _render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
+	sp_vertex_shader_handle vertex_shader_handle;
+	sp_pixel_shader_handle pixel_shader_handle;
+	sp_input_element_desc input_layout[D3D12_STANDARD_VERTEX_ELEMENT_COUNT];
+	sp_texture_format render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
 	sp_texture_format depth_stencil_format = sp_texture_format::unknown;
 };
 

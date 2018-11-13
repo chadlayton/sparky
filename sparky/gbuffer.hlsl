@@ -1,5 +1,5 @@
 Texture2D base_color_texture : register(t0);
-//Texture2D normal_texture : register(t1);
+Texture2D metalness_roughness_texture : register(t1);
 
 SamplerState default_sampler : register(s0);
 
@@ -51,15 +51,17 @@ struct ps_input
 struct ps_output
 {
 	float4 base_color : SV_Target0;
-	float4 normal_ws : SV_Target1;
+	float4 metalness_roughness : SV_Target1;
+	float4 normal_ws : SV_Target2;
 };
 
 ps_output ps_main(ps_input input)
 {
 	ps_output output;
 
-	output.normal_ws = (input.normal_ws + 1) / 2;
 	output.base_color = base_color_texture.Sample(default_sampler, input.texcoord) * input.color;
+	output.metalness_roughness = metalness_roughness_texture.Sample(default_sampler, input.texcoord);
+	output.normal_ws = (input.normal_ws + 1) / 2;
 
 	return output;
 }

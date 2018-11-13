@@ -43,21 +43,21 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	unsigned input_element_count = 0;
 	for (; input_element_count < D3D12_STANDARD_VERTEX_ELEMENT_COUNT; ++input_element_count)
 	{
-		if (!desc._input_layout[input_element_count]._semantic_name)
+		if (!desc.input_layout[input_element_count]._semantic_name)
 		{
 			break;
 		}
 
-		input_element_desc[input_element_count].SemanticName = desc._input_layout[input_element_count]._semantic_name;
-		input_element_desc[input_element_count].SemanticIndex = desc._input_layout[input_element_count]._semantic_index;
-		input_element_desc[input_element_count].Format = desc._input_layout[input_element_count]._format;
+		input_element_desc[input_element_count].SemanticName = desc.input_layout[input_element_count]._semantic_name;
+		input_element_desc[input_element_count].SemanticIndex = desc.input_layout[input_element_count]._semantic_index;
+		input_element_desc[input_element_count].Format = desc.input_layout[input_element_count]._format;
 		input_element_desc[input_element_count].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	}
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
 	pipeline_state_desc.pRootSignature = _sp._root_signature.Get();
-	pipeline_state_desc.VS = CD3DX12_SHADER_BYTECODE(detail::sp_vertex_shader_pool_get(desc._vertex_shader_handle)._blob.Get());
-	pipeline_state_desc.PS = CD3DX12_SHADER_BYTECODE(detail::sp_pixel_shader_pool_get(desc._pixel_shader_handle)._blob.Get());
+	pipeline_state_desc.VS = CD3DX12_SHADER_BYTECODE(detail::sp_vertex_shader_pool_get(desc.vertex_shader_handle)._blob.Get());
+	pipeline_state_desc.PS = CD3DX12_SHADER_BYTECODE(detail::sp_pixel_shader_pool_get(desc.pixel_shader_handle)._blob.Get());
 	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	pipeline_state_desc.SampleMask = UINT_MAX;
 	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -78,12 +78,12 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	unsigned render_target_count = 0;
 	for (; render_target_count < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++render_target_count)
 	{
-		if (desc._render_target_formats[render_target_count] == DXGI_FORMAT_UNKNOWN)
+		if (desc.render_target_formats[render_target_count] == sp_texture_format::unknown)
 		{
 			break;
 		}
 
-		pipeline_state_desc.RTVFormats[render_target_count] = desc._render_target_formats[render_target_count];
+		pipeline_state_desc.RTVFormats[render_target_count] = detail::sp_texture_format_get_srv_format_d3d12(desc.render_target_formats[render_target_count]);
 	}
 	pipeline_state_desc.NumRenderTargets = render_target_count;
 	pipeline_state_desc.SampleDesc.Count = 1;

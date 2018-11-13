@@ -182,14 +182,17 @@ void sp_init(const sp_window& window)
 	*/
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
 	{
+		// https://www.slideshare.net/GaelHofemeier/efficient-rendering-with-directx-12-on-intel-graphics
 		// TODO: Hardcoded
-		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
+		CD3DX12_DESCRIPTOR_RANGE1 range_srv;
+		range_srv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		CD3DX12_DESCRIPTOR_RANGE1 range_cbv;
+		range_cbv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
 		// TODO: Hardcoded
-		CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-		root_parameters[0].InitAsDescriptorTable(static_cast<unsigned>(std::size(ranges)), &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
+		CD3DX12_ROOT_PARAMETER1 root_parameters[2];
+		root_parameters[0].InitAsDescriptorTable(1, &range_srv, D3D12_SHADER_VISIBILITY_ALL);
+		root_parameters[1].InitAsDescriptorTable(1, &range_cbv, D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;

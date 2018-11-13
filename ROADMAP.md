@@ -29,7 +29,7 @@
 - https://software.intel.com/en-us/blogs/2014/08/27/direct3d-12-overview-part-7-dynamic-heaps
 - https://software.intel.com/en-us/blogs/2014/09/05/direct3d-12-overview-part-8-cpu-parallelism
 - https://software.intel.com/en-us/articles/tutorial-migrating-your-apps-to-directx-12-part-1
-- https://software.intel.com/sites/default/files/managed/4a/38/Efficient-Rendering-with-DirectX-12-on-Intel-Graphics.pdf
+- https://software.intel.com/sites/default/files/managed/4a/38/Efficient-Rendering-with-DirectX-12-on-Intel-Graphics.pdf (Resource Binding)
 - https://github.com/vinjn/awesome-d3d12
 - Advanced Graphics Tech: Moving to DirectX 12: Lessons Learned https://www.gdcvault.com/play/1024656/Advanced-Graphics-Tech-Moving-to
 - https://software.intel.com/en-us/articles/introduction-to-resource-binding-in-microsoft-directx-12
