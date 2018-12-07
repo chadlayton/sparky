@@ -10,6 +10,11 @@ cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_materia
 	float4x4 inverse_view_projection_matrix;
 };
 
+cbuffer per_object_cbuffer : register(b1)
+{
+	float4x4 world_matrix;
+}
+
 struct vs_input
 {
 	float3 position_os : POSITION;
@@ -21,19 +26,19 @@ struct vs_input
 struct vs_output
 {
 	float4 position_cs : SV_Position;
-	float4 normal_ws : NORMAL;
+	float3 normal_ws : NORMAL;
 	float2 texcoord : TEXCOORD;
 	float4 color : COLOR;
 };
 
 vs_output vs_main(vs_input input)
 {
-	float4x4 world_view_projection_matrix = view_projection_matrix;
+	float4x4 world_view_projection_matrix = mul(world_matrix, view_projection_matrix);
 
 	vs_output output;
 
 	output.position_cs = mul(float4(input.position_os, 1.0f), world_view_projection_matrix);
-	output.normal_ws = mul(float4(input.normal_os, 0.0f), world_view_projection_matrix);
+	output.normal_ws = mul(float4(input.normal_os, 0.0f), world_matrix).xyz;
 	output.texcoord = input.texcoord;
 	output.color = input.color;
 
@@ -43,7 +48,7 @@ vs_output vs_main(vs_input input)
 struct ps_input
 {
 	float4 position_ss : SV_Position;
-	float4 normal_ws : NORMAL;
+	float3 normal_ws : NORMAL;
 	float2 texcoord : TEXCOORD;
 	float4 color : COLOR;
 };
@@ -61,7 +66,7 @@ ps_output ps_main(ps_input input)
 
 	output.base_color = base_color_texture.Sample(default_sampler, input.texcoord) * input.color;
 	output.metalness_roughness = metalness_roughness_texture.Sample(default_sampler, input.texcoord);
-	output.normal_ws = (input.normal_ws + 1) / 2;
+	output.normal_ws.xyz = (input.normal_ws + 1) / 2;
 
 	return output;
 }
