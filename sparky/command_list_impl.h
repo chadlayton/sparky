@@ -195,3 +195,8 @@ void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_li
 {
 	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_STENCIL, 0.0f, stencil, 0, nullptr);
 }
+
+void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_list, int vertex_count, int instance_count)
+{
+	command_list._command_list_d3d12->DrawInstanced(vertex_count, instance_count, 0, 0);
+}

@@ -75,6 +75,13 @@ float4 ps_main(ps_input input) : SV_Target0
 	float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
 
 	float3 base_color = gbuffer_base_color_texture.Sample(default_sampler, input.texcoord).xyz;
+
+	// TODO: Need some kind of mask for sky
+	if (depth > 0.99)
+	{
+		return float4(base_color, 1.0f);
+	}
+
 	float3 normal_ws = gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1;
 	float3 position_ws = position_ws_from_depth(depth, input.texcoord);
 

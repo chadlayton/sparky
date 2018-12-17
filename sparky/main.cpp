@@ -111,92 +111,106 @@ void camera_update(camera* camera, const input& input)
 
 struct model
 {
+	struct material
+	{
+		int base_color_texture_index = -1;
+		int metalness_roughness_texture_index = -1;
+		std::array<float, 4> base_color_factor = { 1.0f, 1.0f, 1.0f, 1.0f };
+		float metalness_factor = 1.0f;
+		float roughness_factor = 1.0f;
+	};
+
 	struct mesh
 	{
 		int vertex_count;
 		sp_vertex_buffer_handle vertex_buffer_handle;
-		int base_color_texture_index;
-		int metalness_roughness_texture_index;
 	};
 
 	std::vector<mesh> meshes;
+	std::vector<material> materials;
 	std::vector<sp_texture_handle> textures;
 };
 
-model model_create_cube(sp_texture_handle base_color_texture_handle)
+model model_create_cube(sp_texture_handle base_color_texture_handle, sp_texture_handle metalness_roughness_texture_handle)
 {
 	model model;
 
 	model.textures.push_back(base_color_texture_handle);
+	model.textures.push_back(metalness_roughness_texture_handle);
+
+	model::material material;
+
+	material.base_color_texture_index = 0;
+	material.metalness_roughness_texture_index = 1;
+
+	model.materials.push_back(material);
 
 	model::mesh mesh;
-
-	mesh.base_color_texture_index = 0;
-	mesh.metalness_roughness_texture_index = 0;
-
-	struct cube_vertex
 	{
-		math::vec<3> position;
-		math::vec<3> normal;
-		math::vec<2> texcoord;
-		math::vec<4> color;
-	};
+		struct cube_vertex
+		{
+			math::vec<3> position;
+			math::vec<3> normal;
+			math::vec<2> texcoord;
+			math::vec<4> color;
+		};
 
-	cube_vertex cube_vertices[] =
-	{
-		// Front
-		{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+		cube_vertex cube_vertices[] =
+		{
+			// Front
+			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
 
-		// Back
-		{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			// Back
+			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
 
-		// Left
-		{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			// Left
+			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
 
-		// Right
-		{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			// Right
+			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
 
-		// Top
-		{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			// Top
+			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
 
-		// Bottom
-		{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-		{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-	};
+			// Bottom
+			{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+		};
 
-	mesh.vertex_buffer_handle = sp_vertex_buffer_create("cube", { sizeof(cube_vertices), sizeof(cube_vertex) });
-	sp_vertex_buffer_update(mesh.vertex_buffer_handle, cube_vertices, sizeof(cube_vertices));
+		mesh.vertex_buffer_handle = sp_vertex_buffer_create("cube", { sizeof(cube_vertices), sizeof(cube_vertex) });
+		sp_vertex_buffer_update(mesh.vertex_buffer_handle, cube_vertices, sizeof(cube_vertices));
 
-	mesh.vertex_count = static_cast<int>(std::size(cube_vertices));
+		mesh.vertex_count = static_cast<int>(std::size(cube_vertices));
+	}
 
 	model.meshes.push_back(mesh);
 
@@ -205,7 +219,7 @@ model model_create_cube(sp_texture_handle base_color_texture_handle)
 
 namespace detail
 {
-	int get_accessor_stride_bytes(const fx::gltf::Accessor& accessor)
+	int get_stride_bytes(const fx::gltf::Accessor& accessor)
 	{
 		int element_size_bytes = 0;
 		switch (accessor.componentType)
@@ -252,27 +266,9 @@ namespace detail
 
 		return element_size_bytes * element_count;
 	}
-
-	template <typename T>
-	const std::vector<T> get_buffer_data(const fx::gltf::Document& doc, const fx::gltf::Accessor& accessor)
-	{
-		const auto& buffer_view = doc.bufferViews[accessor.bufferView];
-		const auto& buffer = doc.buffers[buffer_view.buffer];
-
-		const int stride_bytes = get_accessor_stride_bytes(accessor);
-
-		assert(stride_bytes == sizeof(T));
-		assert(buffer_view.byteStride == 0 || buffer_view.byteStride == sizeof(T));
-
-		std::vector<T> data(accessor.count);
-
-		std::memcpy(data.data(), &buffer.data[buffer_view.byteOffset + accessor.byteOffset], accessor.count * stride_bytes);
-
-		return data;
-	}
 }
 
-model model_create_from_gltf(const char* path)
+model model_create_from_gltf(const char* path, sp_texture_handle base_color_texture_handle, sp_texture_handle metalness_roughness_texture_handle)
 {
 	model model;
 
@@ -294,7 +290,7 @@ model model_create_from_gltf(const char* path)
 			stbi_uc* image_data = stbi_load(image_path.c_str(), &image_width, &image_height, &image_channels, STBI_rgb_alpha);
 			assert(image_data);
 			
-			sp_texture_handle texture_handle = sp_texture_create(image_fx.name.c_str(), { image_width, image_height, sp_texture_format::r8g8b8a8 });
+			sp_texture_handle texture_handle = sp_texture_create(image_fx.uri.c_str(), { image_width, image_height, sp_texture_format::r8g8b8a8 });
 			sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
 			
 			stbi_image_free(image_data);
@@ -311,7 +307,31 @@ model model_create_from_gltf(const char* path)
 	{
 		for (const auto& primitive_gltf : mesh_fx.primitives)
 		{
-			std::vector<unsigned> indices = detail::get_buffer_data<unsigned>(doc_fx, doc_fx.accessors[primitive_gltf.indices]);
+			std::vector<unsigned> indices;
+			{
+				const auto& index_buffer_accessor_fx = doc_fx.accessors[primitive_gltf.indices];
+				const auto& index_buffer_view_fx = doc_fx.bufferViews[index_buffer_accessor_fx.bufferView];
+				const auto& index_buffer_fx = doc_fx.buffers[index_buffer_view_fx.buffer];
+
+				indices.resize(index_buffer_accessor_fx.count);
+
+				if (index_buffer_accessor_fx.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort)
+				{
+					const unsigned short* index = reinterpret_cast<const unsigned short*>(&index_buffer_fx.data[index_buffer_view_fx.byteOffset + index_buffer_accessor_fx.byteOffset]);
+					for (auto i = 0; i < indices.size(); ++i)
+					{
+						indices[i] = *index++;
+					}
+				}
+				else if (index_buffer_accessor_fx.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt)
+				{
+					memcpy(indices.data(), &index_buffer_fx.data[index_buffer_view_fx.byteOffset + index_buffer_accessor_fx.byteOffset], indices.size() * sizeof(unsigned));
+				}
+				else
+				{
+					assert(false && "indices must be unsigned short or integer type");
+				}
+			}
 
 			std::vector<math::vec<3>> positions;
 			std::vector<math::vec<3>> normals;
@@ -323,28 +343,63 @@ model model_create_from_gltf(const char* path)
 			{
 				if (attrib_fx.first == "POSITION")
 				{
-					positions = detail::get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					const auto& position_buffer_accessor_fx = doc_fx.accessors[attrib_fx.second];
+					const auto& position_buffer_view_fx = doc_fx.bufferViews[position_buffer_accessor_fx.bufferView];
+					const auto& position_buffer_fx = doc_fx.buffers[position_buffer_view_fx.buffer];
+
+					positions.resize(position_buffer_accessor_fx.count);
+
+					memcpy(
+						positions.data(), 
+						&position_buffer_fx.data[position_buffer_view_fx.byteOffset + position_buffer_accessor_fx.byteOffset], 
+						detail::get_stride_bytes(position_buffer_accessor_fx) * position_buffer_accessor_fx.count);
 				}
 				else if (attrib_fx.first == "NORMAL")
 				{
-					normals = detail::get_buffer_data<math::vec<3>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					const auto& normal_buffer_accessor_fx = doc_fx.accessors[attrib_fx.second];
+					const auto& normal_buffer_view_fx = doc_fx.bufferViews[normal_buffer_accessor_fx.bufferView];
+					const auto& normal_buffer_fx = doc_fx.buffers[normal_buffer_view_fx.buffer];
+
+					normals.resize(normal_buffer_accessor_fx.count);
+
+					memcpy(
+						normals.data(), 
+						&normal_buffer_fx.data[normal_buffer_view_fx.byteOffset + normal_buffer_accessor_fx.byteOffset],
+						detail::get_stride_bytes(normal_buffer_accessor_fx) * normal_buffer_accessor_fx.count);
 				}
 				else if (attrib_fx.first == "TANGENT")
 				{
-					tangents = detail::get_buffer_data<math::vec<4>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					const auto& tangent_buffer_accessor_fx = doc_fx.accessors[attrib_fx.second];
+					const auto& tangent_buffer_view_fx = doc_fx.bufferViews[tangent_buffer_accessor_fx.bufferView];
+					const auto& tangent_buffer_fx = doc_fx.buffers[tangent_buffer_view_fx.buffer];
+
+					tangents.resize(tangent_buffer_accessor_fx.count);
+
+					memcpy(
+						tangents.data(), 
+						&tangent_buffer_fx.data[tangent_buffer_view_fx.byteOffset + tangent_buffer_accessor_fx.byteOffset],
+						detail::get_stride_bytes(tangent_buffer_accessor_fx) * tangent_buffer_accessor_fx.count);
 				}
 				else if (attrib_fx.first == "TEXCOORD_0")
 				{
-					texcoords = detail::get_buffer_data<math::vec<2>>(doc_fx, doc_fx.accessors[attrib_fx.second]);
+					const auto& texcoord_buffer_accessor_fx = doc_fx.accessors[attrib_fx.second];
+					const auto& texcoord_buffer_view_fx = doc_fx.bufferViews[texcoord_buffer_accessor_fx.bufferView];
+					const auto& texcoord_buffer_fx = doc_fx.buffers[texcoord_buffer_view_fx.buffer];
+
+					texcoords.resize(texcoord_buffer_accessor_fx.count);
+
+					memcpy(
+						texcoords.data(), 
+						&texcoord_buffer_fx.data[texcoord_buffer_view_fx.byteOffset + texcoord_buffer_accessor_fx.byteOffset],
+						detail::get_stride_bytes(texcoord_buffer_accessor_fx) * texcoord_buffer_accessor_fx.count);
 				}
 			}
 
-			if (texcoords.empty())
+			// TODO: Handle missing required required vertex attributes
+			if (positions.empty() || texcoords.empty() || normals.empty())
 			{
 				continue;
 			}
-
-			math::vec<4> color = { static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX), 1.0f };
 
 			struct vertex
 			{
@@ -354,32 +409,55 @@ model model_create_from_gltf(const char* path)
 				math::vec<4> color;
 			};
 
-			std::vector<vertex> vertices(indices.size());
+			std::vector<vertex> vertices;
+			vertices.reserve(indices.size());
 
 			for (const auto& index : indices)
 			{
-				vertices.push_back({ positions[index], normals[index], texcoords[index], color });
+				vertices.push_back({ positions[index], normals[index], texcoords[index], { 1.0f, 1.0f, 1.0f, 1.0f } });
 			}
 
-			model::mesh mesh;
-			
-			mesh.vertex_buffer_handle = sp_vertex_buffer_create(mesh_fx.name.c_str(), { static_cast<int>(vertices.size() * sizeof(vertex)), static_cast<int>(sizeof(vertex)) });
-			sp_vertex_buffer_update(mesh.vertex_buffer_handle, vertices.data(), static_cast<int>(vertices.size() * sizeof(vertex)));
-			mesh.vertex_count = static_cast<int>(vertices.size());
-			mesh.base_color_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.baseColorTexture.index;
-			//mesh.metalness_roughness_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.metallicRoughnessTexture.index;
-			// TODO: Sketchfab exporter put metal/roughness into the occlusionTexture slot. Fix asset.
-			mesh.metalness_roughness_texture_index = doc_fx.materials[primitive_gltf.material].occlusionTexture.index;
-
-			// TODO: How to handle models that are missing expected textures?
-			if (mesh.base_color_texture_index < 0 || mesh.metalness_roughness_texture_index < 0)
+			model::material material;
 			{
-				continue;
+				material.base_color_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.baseColorTexture.index;
+				material.metalness_roughness_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.metallicRoughnessTexture.index;
+				material.base_color_factor = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.baseColorFactor;
+				material.metalness_factor = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.metallicFactor;
+				material.roughness_factor = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.roughnessFactor;
+			}
+			model.materials.push_back(material);
+
+			model::mesh mesh;
+			{
+				mesh.vertex_buffer_handle = sp_vertex_buffer_create(mesh_fx.name.c_str(), { static_cast<int>(vertices.size() * sizeof(vertex)), static_cast<int>(sizeof(vertex)) });
+				sp_vertex_buffer_update(mesh.vertex_buffer_handle, vertices.data(), static_cast<int>(vertices.size() * sizeof(vertex)));
+				mesh.vertex_count = static_cast<int>(vertices.size());
 			}
 
 			model.meshes.push_back(mesh);
 		}
 	}
+
+	// Fill in any missing materials with the defaults
+	for (auto& material : model.materials)
+	{
+		if (material.base_color_texture_index < 0)
+		{
+			material.base_color_texture_index = static_cast<int>(model.textures.size());
+		}
+	}
+
+	model.textures.push_back(base_color_texture_handle);
+
+	for (auto& material : model.materials)
+	{
+		if (material.metalness_roughness_texture_index < 0)
+		{
+			material.metalness_roughness_texture_index = static_cast<int>(model.textures.size());
+		}
+	}
+
+	model.textures.push_back(metalness_roughness_texture_handle);
 
 	return model;
 }
@@ -420,6 +498,19 @@ int main()
 
 	int frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 
+
+	sp_texture_handle white_texture_handle;
+	{
+		int image_width, image_height, image_channels;
+		stbi_uc* image_data = stbi_load("textures/white.png", &image_width, &image_height, &image_channels, STBI_rgb_alpha);
+		assert(image_data);
+
+		white_texture_handle = sp_texture_create("textures/white.png", { image_width, image_height, sp_texture_format::r8g8b8a8 });
+		sp_texture_update(white_texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
+
+		stbi_image_free(image_data);
+	}
+
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "gbuffer.hlsl" });
 
@@ -440,7 +531,7 @@ int main()
 		sp_texture_format::d32
 	});
 
-	//model scene = model_create_from_gltf("littlest_tokyo/scene.gltf");
+	model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", white_texture_handle, white_texture_handle);
 
 	std::vector<uint8_t> checkerboard_big_image_data = sp_image_checkerboard_data_create(1024, 1024);
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
@@ -450,7 +541,7 @@ int main()
 	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(checkerboard_small_texture_handle, &checkerboard_small_image_data[0], static_cast<int>(checkerboard_small_image_data.size()));
 
-	model cube = model_create_cube(checkerboard_small_texture_handle);
+	model cube = model_create_cube(checkerboard_small_texture_handle, white_texture_handle);
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "lighting.hlsl" });
@@ -535,7 +626,7 @@ int main()
 
 				command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				for (const auto& mesh : cube.meshes)
+				for (int i = 0; i < scene.meshes.size(); ++i)
 				{
 					{
 						const math::mat<4> world_matrix = math::create_identity<4>();
@@ -547,15 +638,38 @@ int main()
 					// XXX: This could all be baked per-draw call
 					// Copy SRV
 					command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[mesh.base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[mesh.metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(scene.textures[scene.materials[i].base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(scene.textures[scene.materials[i].metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 					// Copy CBV
 					command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_object_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-					sp_graphics_command_list_set_vertex_buffers(command_list, &mesh.vertex_buffer_handle, 1);
-					command_list._command_list_d3d12->DrawInstanced(mesh.vertex_count, 1, 0, 0);
+					sp_graphics_command_list_set_vertex_buffers(command_list, &scene.meshes[i].vertex_buffer_handle, 1);
+					sp_graphics_command_list_draw_instanced(command_list, scene.meshes[i].vertex_count, 1);
+				}
+
+				for (int i = 0; i < cube.meshes.size(); ++i)
+				{
+					{
+						const math::mat<4> world_matrix = math::create_identity<4>();
+						constant_buffer_per_object_data.world_matrix = world_matrix;
+
+						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
+					}
+
+					// XXX: This could all be baked per-draw call
+					// Copy SRV
+					command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[cube.materials[i].base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[cube.materials[i].metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					// Copy CBV
+					command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_object_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+					sp_graphics_command_list_set_vertex_buffers(command_list, &cube.meshes[i].vertex_buffer_handle, 1);
+					sp_graphics_command_list_draw_instanced(command_list, cube.meshes[i].vertex_count, 1);
 				}
 			}
 
@@ -577,7 +691,7 @@ int main()
 				command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-				command_list._command_list_d3d12->DrawInstanced(3, 1, 0, 0);
+				sp_graphics_command_list_draw_instanced(command_list, 3, 1);
 			}
 
 			sp_graphics_command_list_close(command_list);
