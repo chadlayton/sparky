@@ -9,6 +9,7 @@
 #include <wrl.h>
 #include <d3d12.h>
 #include <d3dcompiler.h>
+#include <d3d12shader.h>
 
 namespace detail
 {
@@ -86,6 +87,23 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 	return shader_handle;
 }
 
+struct sp_shader_reflection
+{
+	struct constant_buffer
+	{
+		struct constant_variable
+		{
+			const char* name;
+			int size_bytes;
+			int offset_bytes;
+		};
+
+		std::vector<constant_variable> variables;
+	};
+
+	std::vector<constant_buffer> buffers;
+};
+
 sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 {
 	sp_pixel_shader_handle shader_handle = sp_handle_alloc(&detail::resource_pools::pixel_shader_handles);
@@ -116,6 +134,43 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 	}
 
 	assert(SUCCEEDED(hr));
+
+	sp_shader_reflection reflection;
+	{
+		Microsoft::WRL::ComPtr<ID3D12ShaderReflection> reflection_d3d12 = nullptr;
+		D3DReflect(shader._blob->GetBufferPointer(), shader._blob->GetBufferSize(), __uuidof(ID3D12ShaderReflection), (void**)&reflection_d3d12);
+
+		D3D12_SHADER_DESC shader_desc;
+		reflection_d3d12->GetDesc(&shader_desc);
+
+		for (int constant_buffer_index = 0; constant_buffer_index < shader_desc.ConstantBuffers; ++constant_buffer_index)
+		{
+			sp_shader_reflection::constant_buffer constant_buffer_reflection;
+
+			ID3D12ShaderReflectionConstantBuffer* constant_buffer_reflection_d3d12 = reflection_d3d12->GetConstantBufferByIndex(constant_buffer_index);
+
+			D3D12_SHADER_BUFFER_DESC buffer_desc;
+			constant_buffer_reflection_d3d12->GetDesc(&buffer_desc);
+
+			for (int constant_variable_index = 0; constant_variable_index < buffer_desc.Variables; ++constant_variable_index)
+			{
+				sp_shader_reflection::constant_buffer::constant_variable constant_variable_reflection;
+
+				ID3D12ShaderReflectionVariable* constant_variable_reflection_d3d12 = constant_buffer_reflection_d3d12->GetVariableByIndex(constant_variable_index);
+
+				D3D12_SHADER_VARIABLE_DESC variable_desc;
+				constant_variable_reflection_d3d12->GetDesc(&variable_desc);
+
+				constant_variable_reflection.name = variable_desc.Name;
+				constant_variable_reflection.offset_bytes = variable_desc.StartOffset;
+				constant_variable_reflection.size_bytes = variable_desc.Size;
+
+				constant_buffer_reflection.variables.push_back(constant_variable_reflection);
+			}
+
+			reflection.buffers.push_back(constant_buffer_reflection);
+		}
+	}
 
 	return shader_handle;
 }
