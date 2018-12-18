@@ -496,8 +496,8 @@ int main()
 
 	sp_init(window);
 
-	int frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
-
+	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
+	int frame_num = 0;
 
 	sp_texture_handle white_texture_handle;
 	{
@@ -584,10 +584,24 @@ int main()
 		camera_update(&camera, input);
 
 		{
+#ifdef JITTER_MATRIX
+			const math::vec<2> jitter_sample_pattern[] = {
+				{ -1.0f, 1.0f },
+				{ 1.0f, 1.0f },
+				{ -1.0f, -1.0f },
+				{ 1.0f, -1.0f },
+			};
+			const int jitter_sample_pattern_index = (frame_num / 100) % std::size(jitter_sample_pattern);
+			const float jitter_offset = 0.01f;
+			const math::mat<4> jitter_matrix = math::create_translation({ jitter_sample_pattern[jitter_sample_pattern_index] * jitter_offset, 0.0f });
+#else
+			const math::mat<4> jitter_matrix = math::create_identity<4>();
+#endif
+
 			const math::mat<4> camera_transform = camera_get_transform(camera);
 			const math::mat<4> view_matrix = math::inverse(camera_transform);
 			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 10000.0f);
-			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
+			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
 			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
 			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
@@ -678,7 +692,7 @@ int main()
 				command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(lighting_pipeline_state_handle));
 
 				sp_texture_handle lighting_render_target_handles[] = {
-					_sp._back_buffer_texture_handles[frame_index]
+					_sp._back_buffer_texture_handles[back_buffer_index]
 				};
 				sp_graphics_command_list_set_render_targets(command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
 
@@ -707,7 +721,9 @@ int main()
 
 		sp_graphics_command_list_reset(command_list);
 
-		frame_index = _sp._swap_chain->GetCurrentBackBufferIndex();
+		back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
+
+		++frame_num;
 
 		input_update(&input);
 	}
