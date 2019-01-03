@@ -80,6 +80,7 @@ ps_output ps_main(ps_input input)
 #endif
 
 	output.normal_ws.xyz = (input.normal_ws + 1) / 2;
+	output.normal_ws.w = 0;
 
 	return output;
 }

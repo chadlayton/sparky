@@ -143,7 +143,7 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 		D3D12_SHADER_DESC shader_desc;
 		reflection_d3d12->GetDesc(&shader_desc);
 
-		for (int constant_buffer_index = 0; constant_buffer_index < shader_desc.ConstantBuffers; ++constant_buffer_index)
+		for (int constant_buffer_index = 0; constant_buffer_index < static_cast<int>(shader_desc.ConstantBuffers); ++constant_buffer_index)
 		{
 			sp_shader_reflection::constant_buffer constant_buffer_reflection;
 
@@ -152,7 +152,7 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 			D3D12_SHADER_BUFFER_DESC buffer_desc;
 			constant_buffer_reflection_d3d12->GetDesc(&buffer_desc);
 
-			for (int constant_variable_index = 0; constant_variable_index < buffer_desc.Variables; ++constant_variable_index)
+			for (int constant_variable_index = 0; constant_variable_index < static_cast<int>(buffer_desc.Variables); ++constant_variable_index)
 			{
 				sp_shader_reflection::constant_buffer::constant_variable constant_variable_reflection;
 

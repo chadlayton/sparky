@@ -4,6 +4,7 @@
 #include "constant_buffer.h"
 #include "pipeline.h"
 #include "descriptor.h"
+#include "debug_gui.h"
 #include "d3dx12.h"
 
 #if SP_DEBUG_RENDERDOC_HOOK_ENABLED
@@ -30,6 +31,8 @@ struct sp
 	sp_descriptor_heap _descriptor_heap_dsv_cpu;
 	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu;
 	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_gpu;
+
+	sp_descriptor_heap _descriptor_heap_debug_gui_gpu;
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
 
@@ -262,6 +265,10 @@ void sp_init(const sp_window& window)
 		texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
 		device->CreateRenderTargetView(texture._resource.Get(), nullptr, texture._render_target_view._handle_cpu_d3d12);
 	}
+
+	_sp._descriptor_heap_debug_gui_gpu = sp_descriptor_heap_create("debug_gui_gpu", { 1024, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
+
+	detail::sp_debug_gui_init(device.Get(), window, sp_descriptor_alloc(&_sp._descriptor_heap_debug_gui_gpu));
 }
 
 void sp_shutdown()
@@ -278,6 +285,8 @@ void sp_shutdown()
 	detail::sp_constant_buffer_pool_destroy();
 	detail::sp_pixel_shader_pool_destroy();
 	detail::sp_vertex_shader_pool_destroy();
+
+	sp_descriptor_heap_destroy(&_sp._descriptor_heap_debug_gui_gpu);
 }
 
 void sp_graphics_queue_execute(sp_graphics_command_list command_list)

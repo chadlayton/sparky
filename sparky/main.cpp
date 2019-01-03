@@ -11,6 +11,7 @@
 #include "pipeline.h"
 #include "sparky.h"
 #include "math.h"
+#include "debug_gui.h"
 
 #include "command_list_impl.h"
 #include "constant_buffer_impl.h"
@@ -19,6 +20,7 @@
 #include "vertex_buffer_impl.h"
 #include "shader_impl.h"
 #include "descriptor_impl.h"
+#include "debug_gui_impl.h"
 
 #include <string>
 #include <cassert>
@@ -26,6 +28,7 @@
 #include <array>
 #include <vector>
 #include <utility>
+#include <iostream>
 
 #include <windows.h>
 #include <wrl.h>
@@ -83,7 +86,7 @@ void camera_update(camera* camera, const input& input)
 {
 	const math::mat<4> camera_transform = camera_get_transform(*camera);
 
-	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 10.0f : 1.0f;
+	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 100.0f : 1.0f;
 
 	if (input.current.keys['A'])
 	{
@@ -272,7 +275,12 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 {
 	model model;
 
-	fx::gltf::Document doc_fx = fx::gltf::LoadFromText(path);
+	const fx::gltf::ReadQuotas read_quotas_fx = {
+		fx::gltf::detail::DefaultMaxBufferCount,
+		fx::gltf::detail::DefaultMaxMemoryAllocation * 2,
+		fx::gltf::detail::DefaultMaxMemoryAllocation * 2,
+	};
+	fx::gltf::Document doc_fx = fx::gltf::LoadFromText(path, read_quotas_fx);
 
 	model.textures.reserve(doc_fx.textures.size());
 
@@ -531,7 +539,8 @@ int main()
 		sp_texture_format::d32
 	});
 
-	model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", white_texture_handle, white_texture_handle);
+	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", white_texture_handle, white_texture_handle);
+	model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", white_texture_handle, white_texture_handle);
 
 	std::vector<uint8_t> checkerboard_big_image_data = sp_image_checkerboard_data_create(1024, 1024);
 	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
@@ -600,7 +609,7 @@ int main()
 
 			const math::mat<4> camera_transform = camera_get_transform(camera);
 			const math::mat<4> view_matrix = math::inverse(camera_transform);
-			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 2, aspect_ratio, 0.1f, 10000.0f);
+			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
 			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 

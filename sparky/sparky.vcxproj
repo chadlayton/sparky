@@ -101,7 +101,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)third_party\stb;$(SolutionDir)third_party\RenderDoc;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\fx-gltf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\stb;$(SolutionDir)third_party\RenderDoc;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\imgui\;$(SolutionDir)third_party\fx-gltf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -132,7 +132,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)third_party\stb;$(SolutionDir)third_party\RenderDoc;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\fx-gltf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\stb;$(SolutionDir)third_party\RenderDoc;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\imgui\;$(SolutionDir)third_party\fx-gltf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,6 +147,8 @@
     <ClInclude Include="command_list.h" />
     <ClInclude Include="constant_buffer.h" />
     <ClInclude Include="constant_buffer_impl.h" />
+    <ClInclude Include="debug_gui.h" />
+    <ClInclude Include="debug_gui_impl.h" />
     <ClInclude Include="descriptor.h" />
     <ClInclude Include="descriptor_impl.h" />
     <ClInclude Include="handle.h" />

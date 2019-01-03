@@ -60,6 +60,12 @@
     <ClInclude Include="descriptor_impl.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="debug_gui.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="debug_gui_impl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="command_list_impl.h">
