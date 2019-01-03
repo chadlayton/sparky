@@ -483,12 +483,26 @@ int main()
 	sp_window_event_set_key_down_callback(
 		[](void* user_data, char key) {
 			static_cast<input::state*>(user_data)->keys[key] = true;
+
+			// TODO: Ugh. Would like debug_gui integration to be automatic.
+			int button = 0;
+			if (key == WM_LBUTTONDOWN) button = 0;
+			if (key == WM_RBUTTONDOWN) button = 1;
+			if (key == WM_MBUTTONDOWN) button = 2;
+			ImGui::GetIO().MouseDown[button] = true;
 		},
 		&input.current);
 
 	sp_window_event_set_key_up_callback(
 		[](void* user_data, char key) {
 			static_cast<input::state*>(user_data)->keys[key] = false;
+
+			// TODO: Ugh. Would like debug_gui integration to be automatic.
+			int button = 0;
+			if (key == WM_LBUTTONUP) button = 0;
+			if (key == WM_RBUTTONUP) button = 1;
+			if (key == WM_MBUTTONUP) button = 2;
+			ImGui::GetIO().MouseDown[button] = false;
 		},
 		&input.current);
 
