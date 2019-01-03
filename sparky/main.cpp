@@ -590,6 +590,8 @@ int main()
 
 	while (sp_window_poll())
 	{
+		detail::sp_debug_gui_begin_frame();
+
 		camera_update(&camera, input);
 
 		{
@@ -716,6 +718,15 @@ int main()
 
 				sp_graphics_command_list_draw_instanced(command_list, 3, 1);
 			}
+
+			sp_debug_gui_show_demo_window();
+
+			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
+			// since the default imgui implementation expects to be the only one using it.
+			ID3D12DescriptorHeap* descriptor_heaps2[] = { _sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get() };
+			command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps2)), descriptor_heaps2);
+
+			detail::sp_debug_gui_record_draw_commands(command_list);
 
 			sp_graphics_command_list_close(command_list);
 
