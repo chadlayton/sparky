@@ -521,18 +521,6 @@ int main()
 	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
 
-	sp_texture_handle white_texture_handle;
-	{
-		int image_width, image_height, image_channels;
-		stbi_uc* image_data = stbi_load("textures/white.png", &image_width, &image_height, &image_channels, STBI_rgb_alpha);
-		assert(image_data);
-
-		white_texture_handle = sp_texture_create("textures/white.png", { image_width, image_height, sp_texture_format::r8g8b8a8 });
-		sp_texture_update(white_texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
-
-		stbi_image_free(image_data);
-	}
-
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "gbuffer.hlsl" });
 
@@ -553,18 +541,10 @@ int main()
 		sp_texture_format::d32
 	});
 
-	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", white_texture_handle, white_texture_handle);
-	model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", white_texture_handle, white_texture_handle);
+	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 
-	std::vector<uint8_t> checkerboard_big_image_data = sp_image_checkerboard_data_create(1024, 1024);
-	sp_texture_handle checkerboard_big_texture_handle = sp_texture_create("checkerboard_big", { 1024, 1024, sp_texture_format::r8g8b8a8 });
-	sp_texture_update(checkerboard_big_texture_handle, &checkerboard_big_image_data[0], static_cast<int>(checkerboard_big_image_data.size()));
-
-	std::vector<uint8_t> checkerboard_small_image_data = sp_image_checkerboard_data_create(128, 128);
-	sp_texture_handle checkerboard_small_texture_handle = sp_texture_create("checkerboard_small", { 128, 128, sp_texture_format::r8g8b8a8 });
-	sp_texture_update(checkerboard_small_texture_handle, &checkerboard_small_image_data[0], static_cast<int>(checkerboard_small_image_data.size()));
-
-	model cube = model_create_cube(checkerboard_small_texture_handle, white_texture_handle);
+	model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "lighting.hlsl" });
@@ -583,6 +563,7 @@ int main()
 		math::mat<4> projection_matrix;
 		math::mat<4> view_projection_matrix;
 		math::mat<4> inverse_view_projection_matrix;
+		math::vec<3> camera_position_ws;
 
 	} constant_buffer_per_frame_data;
 
@@ -632,6 +613,7 @@ int main()
 			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
 			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
 			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
+			constant_buffer_per_frame_data.camera_position_ws = camera.position;
 
 			sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
 		}
@@ -724,6 +706,7 @@ int main()
 				// Copy SRV
 				command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				// Copy CBV

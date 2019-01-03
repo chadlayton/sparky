@@ -47,6 +47,9 @@ namespace detail
 	sp_texture_handle sp_texture_handle_alloc();
 	void sp_texture_handle_free(sp_texture_handle texture_handle);
 	sp_texture& sp_texture_pool_get(sp_texture_handle texture_handle);
+
+	void sp_texture_defaults_create();
+	void sp_texture_defaults_destroy();
 }
 
 namespace detail
@@ -112,9 +115,10 @@ namespace detail
 	}
 }
 
-
-std::vector<uint8_t> sp_image_checkerboard_data_create(int width, int height);
-
 sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& desc);
 void sp_texture_destroy(sp_texture_handle texture_handle);
-void sp_texture_update(const sp_texture_handle& texture_handle, void* data_cpu, int size_bytes);
+void sp_texture_update(const sp_texture_handle& texture_handle, const void* data_cpu, int size_bytes);
+
+sp_texture_handle sp_texture_defaults_white();
+sp_texture_handle sp_texture_defaults_black();
+sp_texture_handle sp_texture_defaults_checkerboard();

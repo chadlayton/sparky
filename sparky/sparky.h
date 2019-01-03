@@ -243,6 +243,8 @@ void sp_init(const sp_window& window)
 	detail::sp_pixel_shader_pool_create();
 	detail::sp_vertex_shader_pool_create();
 
+	detail::sp_texture_defaults_create();
+
 	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; ++back_buffer_index)
 	{
 		// TODO: sp_texture_create_from_swap_chain?
@@ -279,6 +281,8 @@ void sp_shutdown()
 		_sp._back_buffer_texture_handles[back_buffer_index] = sp_texture_handle();
 	}
 
+	detail::sp_texture_defaults_destroy();
+
 	detail::sp_texture_pool_destroy();
 	detail::sp_vertex_buffer_pool_destroy();
 	detail::sp_graphics_pipeline_state_pool_destroy();
@@ -286,6 +290,10 @@ void sp_shutdown()
 	detail::sp_pixel_shader_pool_destroy();
 	detail::sp_vertex_shader_pool_destroy();
 
+	sp_descriptor_heap_destroy(&_sp._descriptor_heap_dsv_cpu);
+	sp_descriptor_heap_destroy(&_sp._descriptor_heap_rtv_cpu);
+	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_cpu);
+	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_gpu);
 	sp_descriptor_heap_destroy(&_sp._descriptor_heap_debug_gui_gpu);
 }
 

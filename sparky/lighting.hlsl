@@ -1,6 +1,7 @@
 Texture2D gbuffer_base_color_texture : register(t0);
-Texture2D gbuffer_normal_map_texture : register(t1);
-Texture2D gbuffer_depth_texture : register(t2);
+Texture2D gbuffer_metalness_roughness_texture : register(t1);
+Texture2D gbuffer_normal_map_texture : register(t2);
+Texture2D gbuffer_depth_texture : register(t3);
 
 SamplerState default_sampler : register(s0);
 
@@ -9,6 +10,7 @@ cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_materia
 	float4x4 projection_matrix;
 	float4x4 view_projection_matrix;
 	float4x4 inverse_view_projection_matrix;
+	float3 camera_position_ws;
 };
 
 struct vs_input
@@ -57,7 +59,13 @@ vs_output vs_main(vs_input input)
 struct point_light
 {
 	float3 position_ws;
-	float intensity;      // radiant intensity (power per unit steradian)
+	float intensity;      // Radiant intensity. Power per unit steradian.
+};
+
+struct directional_light
+{
+	float3 direction_ws; 
+	float irradiance;	// Power per unit area received by surface with normal facing direction
 };
 
 struct ps_input
@@ -68,26 +76,34 @@ struct ps_input
 
 float4 ps_main(ps_input input) : SV_Target0
 {
-	point_light light;
-	light.position_ws = float3(0.0f, 0.0f, -10.0f);
-	light.intensity = 10;
+	directional_light sun_light;
+	sun_light.direction_ws = float3(0.0f, 1.0f, -1.0f);
+	sun_light.irradiance = 10;
 
 	float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
 
-	float3 base_color = gbuffer_base_color_texture.Sample(default_sampler, input.texcoord).xyz;
-
 	// TODO: Need some kind of mask for sky
-	if (depth > 0.99)
-	{
-		return float4(base_color, 1.0f);
-	}
+	//if (depth > 0.99)
+	//{
+	//	return float4(0.0f, 0.3f, 0.8f, 1.0f);
+	//}
 
+	// Surface properties
+	float3 base_color = gbuffer_base_color_texture.Sample(default_sampler, input.texcoord).xyz;
+	float2 metalness_roughness = gbuffer_metalness_roughness_texture.Sample(default_sampler, input.texcoord).xy;
+	float metalness = metalness_roughness.r;
+	float roughness = metalness_roughness.g;
 	float3 normal_ws = gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1;
 	float3 position_ws = position_ws_from_depth(depth, input.texcoord);
+	float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws);
 
-	float3 direction_to_light = normalize(light.position_ws - position_ws);
-	float n_dot_l = saturate(dot(normal_ws, direction_to_light));
-	float3 color = base_color * n_dot_l;
+	float3 light = float3(0.3, 0.3, 0.3);
 
-	return float4(color, 1.0f);
+	{
+		float3 direction_to_light_ws = normalize(-sun_light.direction_ws);
+		float n_dot_l = saturate(dot(normal_ws, direction_to_light_ws));
+		light += base_color * n_dot_l;
+	}
+
+	return float4(light, 1.0f);
 }
