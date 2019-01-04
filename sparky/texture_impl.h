@@ -135,20 +135,19 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	resource_desc_d3d12.SampleDesc.Quality = 0;
 	resource_desc_d3d12.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-	D3D12_CLEAR_VALUE optimized_clear_value = {};
 	if (detail::sp_texture_format_is_depth(desc.format))
 	{
-		optimized_clear_value.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
-		optimized_clear_value.DepthStencil.Depth = 1.0f;
-		optimized_clear_value.DepthStencil.Stencil = 0;
+		texture._optimized_clear_value.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
+		texture._optimized_clear_value.DepthStencil.Depth = 1.0f;
+		texture._optimized_clear_value.DepthStencil.Stencil = 0;
 	}
 	else
 	{
-		optimized_clear_value.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
-		optimized_clear_value.Color[0] = 0.0f;
-		optimized_clear_value.Color[1] = 0.0f;
-		optimized_clear_value.Color[2] = 0.0f;
-		optimized_clear_value.Color[3] = 0.0f;
+		texture._optimized_clear_value.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
+		texture._optimized_clear_value.Color[0] = 0.0f;
+		texture._optimized_clear_value.Color[1] = 0.0f;
+		texture._optimized_clear_value.Color[2] = 0.0f;
+		texture._optimized_clear_value.Color[3] = 0.0f;
 	}
 
 	HRESULT hr = _sp._device->CreateCommittedResource(
@@ -156,7 +155,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		D3D12_HEAP_FLAG_NONE,
 		&resource_desc_d3d12,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		&optimized_clear_value,
+		&texture._optimized_clear_value,
 		IID_PPV_ARGS(&texture._resource));
 	assert(hr == S_OK);
 

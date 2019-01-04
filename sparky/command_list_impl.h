@@ -176,24 +176,54 @@ void sp_graphics_command_list_set_scissor_rect(sp_graphics_command_list& command
 	command_list._command_list_d3d12->RSSetScissorRects(1, &CD3DX12_RECT(scissor.x, scissor.y, scissor.x + scissor.width, scissor.y + scissor.height));
 }
 
-void sp_graphics_command_list_clear_render_target(sp_graphics_command_list& command_list, sp_texture_handle render_target_handle, std::array<float, 4> color)
+void sp_graphics_command_list_clear_render_target(sp_graphics_command_list& command_list, sp_texture_handle render_target_handle)
 {
-	command_list._command_list_d3d12->ClearRenderTargetView(detail::sp_texture_pool_get(render_target_handle)._render_target_view._handle_cpu_d3d12, &color[0], 0, nullptr);
+	const sp_texture& texture = detail::sp_texture_pool_get(render_target_handle);
+
+	command_list._command_list_d3d12->ClearRenderTargetView(
+		texture._render_target_view._handle_cpu_d3d12, 
+		texture._optimized_clear_value.Color, 
+		0, 
+		nullptr);
 }
 
-void sp_graphics_command_list_clear_depth_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle, float depth, int stencil)
+void sp_graphics_command_list_clear_depth_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle)
 {
-	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0, nullptr);
+	const sp_texture& texture = detail::sp_texture_pool_get(depth_stencil_handle);
+
+	command_list._command_list_d3d12->ClearDepthStencilView(
+		texture._depth_stencil_view._handle_cpu_d3d12, 
+		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 
+		texture._optimized_clear_value.DepthStencil.Depth, 
+		texture._optimized_clear_value.DepthStencil.Stencil, 
+		0, 
+		nullptr);
 }
 
-void sp_graphics_command_list_clear_depth(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle, float depth)
+void sp_graphics_command_list_clear_depth(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle)
 {
-	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
+	const sp_texture& texture = detail::sp_texture_pool_get(depth_stencil_handle);
+
+	command_list._command_list_d3d12->ClearDepthStencilView(
+		texture._depth_stencil_view._handle_cpu_d3d12,
+		D3D12_CLEAR_FLAG_DEPTH,
+		texture._optimized_clear_value.DepthStencil.Depth,
+		0,
+		0,
+		nullptr);
 }
 
-void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle, int stencil)
+void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle)
 {
-	command_list._command_list_d3d12->ClearDepthStencilView(detail::sp_texture_pool_get(depth_stencil_handle)._depth_stencil_view._handle_cpu_d3d12, D3D12_CLEAR_FLAG_STENCIL, 0.0f, stencil, 0, nullptr);
+	const sp_texture& texture = detail::sp_texture_pool_get(depth_stencil_handle);
+
+	command_list._command_list_d3d12->ClearDepthStencilView(
+		texture._depth_stencil_view._handle_cpu_d3d12,
+		D3D12_CLEAR_FLAG_STENCIL,
+		0,
+		texture._optimized_clear_value.DepthStencil.Stencil,
+		0,
+		nullptr);
 }
 
 void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_list, int vertex_count, int instance_count)

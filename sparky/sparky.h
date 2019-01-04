@@ -87,13 +87,14 @@ void sp_init(const sp_window& window)
 		Microsoft::WRL::ComPtr<ID3D12Debug> debug_interface;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug_interface))))
 		{
-			Microsoft::WRL::ComPtr<ID3D12Debug1> debug_interface1;
-			debug_interface.As(&debug_interface1);
-
-			debug_interface1->EnableDebugLayer();
-			debug_interface1->SetEnableGPUBasedValidation(true);
-
 			dxgi_factory_flags |= DXGI_CREATE_FACTORY_DEBUG;
+
+			Microsoft::WRL::ComPtr<ID3D12Debug1> debug_interface1;
+			if (SUCCEEDED(debug_interface.As(&debug_interface1)))
+			{
+				debug_interface1->EnableDebugLayer();
+				debug_interface1->SetEnableGPUBasedValidation(true);
+			}
 		}
 		else
 		{
@@ -295,6 +296,22 @@ void sp_shutdown()
 	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_cpu);
 	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_gpu);
 	sp_descriptor_heap_destroy(&_sp._descriptor_heap_debug_gui_gpu);
+
+	_sp._swap_chain.Reset();
+	_sp._graphics_queue.Reset();
+	_sp._root_signature.Reset();
+
+#if _DEBUG
+	{
+		Microsoft::WRL::ComPtr<ID3D12DebugDevice> debug_device_interface;
+		if (SUCCEEDED(_sp._device->QueryInterface(IID_PPV_ARGS(&debug_device_interface))))
+		{
+			debug_device_interface->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+		}
+	}
+#endif
+
+	_sp._device.Reset();
 }
 
 void sp_graphics_queue_execute(sp_graphics_command_list command_list)

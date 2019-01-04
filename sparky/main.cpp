@@ -640,10 +640,10 @@ int main()
 				};
 				sp_graphics_command_list_set_render_targets(command_list, gbuffer_render_target_handles, static_cast<int>(std::size(gbuffer_render_target_handles)), gbuffer_depth_texture_handle);
 
-				sp_graphics_command_list_clear_render_target(command_list, gbuffer_base_color_texture_handle, { 1.0f, 0.0f, 0.0f, 0.0f });
-				sp_graphics_command_list_clear_render_target(command_list, gbuffer_metalness_roughness_texture_handle, { 0.0f, 0.0f, 0.0f, 0.0f });
-				sp_graphics_command_list_clear_render_target(command_list, gbuffer_normals_texture_handle, { 0.0f, 0.0f, 0.0f, 0.0f });
-				sp_graphics_command_list_clear_depth(command_list, gbuffer_depth_texture_handle, 1.0f);
+				sp_graphics_command_list_clear_render_target(command_list, gbuffer_base_color_texture_handle);
+				sp_graphics_command_list_clear_render_target(command_list, gbuffer_metalness_roughness_texture_handle);
+				sp_graphics_command_list_clear_render_target(command_list, gbuffer_normals_texture_handle);
+				sp_graphics_command_list_clear_depth(command_list, gbuffer_depth_texture_handle);
 
 				command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

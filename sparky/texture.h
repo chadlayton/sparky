@@ -36,6 +36,8 @@ struct sp_texture
 	sp_descriptor_handle _depth_stencil_view;
 
 	D3D12_RESOURCE_STATES _default_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+	D3D12_CLEAR_VALUE _optimized_clear_value;
 };
 
 using sp_texture_handle = sp_handle;
