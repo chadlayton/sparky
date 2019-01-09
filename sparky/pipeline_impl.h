@@ -61,6 +61,7 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	pipeline_state_desc.SampleMask = UINT_MAX;
 	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	pipeline_state_desc.RasterizerState.FrontCounterClockwise = TRUE;
 	if (desc.depth_stencil_format == sp_texture_format::unknown)
 	{
 		pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;

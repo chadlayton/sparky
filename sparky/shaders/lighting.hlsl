@@ -29,9 +29,8 @@ struct vs_output
 };
 
 // http://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau
-void fullscreen_triangle(in uint vertex_id, out float4 position_cs, out float2 texcoord)
+void fullscreen_triangle_cw(in uint vertex_id, out float4 position_cs, out float2 texcoord)
 {
-	// Generate the clip-space position
 	position_cs.x = (float)(vertex_id / 2) * 4.0 - 1.0;
 	position_cs.y = (float)(vertex_id % 2) * 4.0 - 1.0;
 	position_cs.z = 0.0;
@@ -40,6 +39,18 @@ void fullscreen_triangle(in uint vertex_id, out float4 position_cs, out float2 t
 	// Generate the texture coordinates
 	texcoord.x = (float)(vertex_id / 2) * 2.0f;
 	texcoord.y = 1.0f - (float)(vertex_id % 2) * 2.0f;
+}
+
+void fullscreen_triangle_ccw(in uint vertex_id, out float4 position_cs, out float2 texcoord)
+{
+	position_cs.x = (float)((2 - vertex_id) / 2) * 4.0 - 1.0;
+	position_cs.y = (float)((2 - vertex_id) % 2) * 4.0 - 1.0;
+	position_cs.z = 0.0;
+	position_cs.w = 1.0;
+
+	// Generate the texture coordinates
+	texcoord.x = (float)((2 - vertex_id) / 2) * 2.0f;
+	texcoord.y = 1.0f - (float)((2 - vertex_id) % 2) * 2.0f;
 }
 
 float3 position_ws_from_depth(in float depth_post_projection, in float2 texcoord)
@@ -55,7 +66,7 @@ vs_output vs_main(vs_input input)
 {
 	vs_output output;
 
-	fullscreen_triangle(input.vertex_id, output.position_cs, output.texcoord);
+	fullscreen_triangle_ccw(input.vertex_id, output.position_cs, output.texcoord);
 
 	return output;
 }
@@ -219,5 +230,5 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	// lighting = tonemap_uncharted2(lighting);
 
-	return float4(lighting, 1.0f);
+	return float4(base_color, lighting.r + lighting.g + lighting.b);
 }

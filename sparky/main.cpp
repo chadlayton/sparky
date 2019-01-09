@@ -323,9 +323,17 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 
 				indices.resize(index_buffer_accessor_fx.count);
 
-				if (index_buffer_accessor_fx.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort)
+				if (index_buffer_accessor_fx.componentType == fx::gltf::Accessor::ComponentType::UnsignedByte)
 				{
-					const unsigned short* index = reinterpret_cast<const unsigned short*>(&index_buffer_fx.data[index_buffer_view_fx.byteOffset + index_buffer_accessor_fx.byteOffset]);
+					const uint8_t* index = reinterpret_cast<const uint8_t*>(&index_buffer_fx.data[index_buffer_view_fx.byteOffset + index_buffer_accessor_fx.byteOffset]);
+					for (auto i = 0; i < indices.size(); ++i)
+					{
+						indices[i] = *index++;
+					}
+				}
+				else if (index_buffer_accessor_fx.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort)
+				{
+					const uint16_t* index = reinterpret_cast<const uint16_t*>(&index_buffer_fx.data[index_buffer_view_fx.byteOffset + index_buffer_accessor_fx.byteOffset]);
 					for (auto i = 0; i < indices.size(); ++i)
 					{
 						indices[i] = *index++;
@@ -337,7 +345,7 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 				}
 				else
 				{
-					assert(false && "indices must be unsigned short or integer type");
+					assert(false);
 				}
 			}
 
@@ -543,7 +551,8 @@ int main()
 
 	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	//model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	model scene = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 
 	model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
 
