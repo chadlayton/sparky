@@ -14,6 +14,7 @@ cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_materia
 	float4x4 view_projection_matrix;
 	float4x4 inverse_view_projection_matrix;
 	float3 camera_position_ws;
+	float3 sun_direction_ws;
 };
 
 struct vs_input
@@ -166,7 +167,7 @@ struct ps_input
 float4 ps_main(ps_input input) : SV_Target0
 {
 	directional_light sun_light;
-	sun_light.direction_ws = float3(-0.25, -1.0, -0.25);
+	sun_light.direction_ws = sun_direction_ws;
 	sun_light.irradiance = 10;
 
 	float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;

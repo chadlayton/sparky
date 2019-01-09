@@ -542,7 +542,8 @@ int main()
 	});
 
 	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 
 	model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
 
@@ -564,6 +565,9 @@ int main()
 		math::mat<4> view_projection_matrix;
 		math::mat<4> inverse_view_projection_matrix;
 		math::vec<3> camera_position_ws;
+		float dummy;
+		// TODO: Not sure if I want this in scene constants or a seprate lighting constants
+		math::vec<3> sun_direction_ws;
 
 	} constant_buffer_per_frame_data;
 
@@ -583,11 +587,30 @@ int main()
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, sp_texture_format::r8g8b8a8 });
 	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, sp_texture_format::d32 });
 
+	math::vec<3> sun_direction_ws = math::normalize<3>({ -0.25f, -1.0f, -0.25f });
+
 	while (sp_window_poll())
 	{
 		detail::sp_debug_gui_begin_frame();
 
 		camera_update(&camera, input);
+
+		if (input.current.keys[VK_LEFT])
+		{
+			sun_direction_ws = math::transform_vector(math::create_rotation_y(0.1f), sun_direction_ws);
+		}
+		if (input.current.keys[VK_RIGHT])
+		{
+			sun_direction_ws = math::transform_vector(math::create_rotation_y(-0.1f), sun_direction_ws);
+		}
+		if (input.current.keys[VK_UP])
+		{
+			sun_direction_ws = math::transform_vector(math::create_rotation_x(0.1f), sun_direction_ws);
+		}
+		if (input.current.keys[VK_DOWN])
+		{
+			sun_direction_ws = math::transform_vector(math::create_rotation_x(-0.1f), sun_direction_ws);
+		}
 
 		{
 #ifdef JITTER_MATRIX
@@ -614,6 +637,7 @@ int main()
 			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
 			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 			constant_buffer_per_frame_data.camera_position_ws = camera.position;
+			constant_buffer_per_frame_data.sun_direction_ws = sun_direction_ws;
 
 			sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
 		}
@@ -716,7 +740,12 @@ int main()
 				sp_graphics_command_list_draw_instanced(command_list, 3, 1);
 			}
 
-			sp_debug_gui_show_demo_window();
+			//sp_debug_gui_show_demo_window();
+			//bool open = true;
+			//int window_flags = 0;
+			//ImGui::Begin("Sparky", &open, window_flags);
+			//ImGui::InputFloat3("Sun Direction", sun_direction_ws.data, 1);
+			//ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
 			// since the default imgui implementation expects to be the only one using it.
