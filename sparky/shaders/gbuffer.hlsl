@@ -81,8 +81,7 @@ ps_output ps_main(ps_input input)
 	output.metalness_roughness = metalness_roughness_texture.Sample(default_sampler, input.texcoord);
 #endif
 
-	output.normal_ws.xyz = (input.normal_ws + 1) / 2;
-	output.normal_ws.w = 0;
+	output.normal_ws = float4((normalize(input.normal_ws) + 1) / 2, 1.0);
 
 	return output;
 }

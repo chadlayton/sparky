@@ -98,17 +98,17 @@ void camera_update(camera* camera, const input& input)
 	}
 	if (input.current.keys['W'])
 	{
-		camera->position += math::get_forward(camera_transform) * 0.1f * movement_speed_mod;
+		camera->position -= math::get_forward(camera_transform) * 0.1f * movement_speed_mod;
 	}
 	if (input.current.keys['S'])
 	{
-		camera->position -= math::get_forward(camera_transform) * 0.1f * movement_speed_mod;
+		camera->position += math::get_forward(camera_transform) * 0.1f * movement_speed_mod;
 	}
 
 	if (input.current.keys[VK_LBUTTON] && input.current.mouse.is_in_client_area && input.previous.mouse.is_in_client_area)
 	{
-		camera->rotation.y -= (input.current.mouse.x - input.previous.mouse.x) * 0.01f;
-		camera->rotation.x += (input.current.mouse.y - input.previous.mouse.y) * 0.01f;
+		camera->rotation.y += (input.current.mouse.x - input.previous.mouse.x) * 0.01f;
+		camera->rotation.x -= (input.current.mouse.y - input.previous.mouse.y) * 0.01f;
 	}
 }
 
@@ -121,6 +121,7 @@ struct model
 		std::array<float, 4> base_color_factor = { 1.0f, 1.0f, 1.0f, 1.0f };
 		float metalness_factor = 1.0f;
 		float roughness_factor = 1.0f;
+		bool double_sided = false;
 	};
 
 	struct mesh
@@ -145,6 +146,7 @@ model model_create_cube(sp_texture_handle base_color_texture_handle, sp_texture_
 
 	material.base_color_texture_index = 0;
 	material.metalness_roughness_texture_index = 1;
+	material.double_sided = true;
 
 	model.materials.push_back(material);
 
@@ -161,52 +163,52 @@ model model_create_cube(sp_texture_handle base_color_texture_handle, sp_texture_
 		cube_vertex cube_vertices[] =
 		{
 			// Front
-			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ {  0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ {  0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
 
 			// Back
-			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { -0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
 
 			// Left
-			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f, -0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f,  0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { -0.5f,  0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f,  0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
 
 			// Right
-			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f,  0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ {  0.5f, -0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f,  0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ {  0.5f,  0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
 
 			// Top
-			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { 0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ {  0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ {  0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
 
 			// Bottom
-			{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-			{ { 0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-			{ { 0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-			{ { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f, -1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+			{ { -0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f, -1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f, -1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+			{ {  0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f, -1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
 		};
 
 		mesh.vertex_buffer_handle = sp_vertex_buffer_create("cube", { sizeof(cube_vertices), sizeof(cube_vertex) });
@@ -435,11 +437,14 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 
 			model::material material;
 			{
-				material.base_color_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.baseColorTexture.index;
-				material.metalness_roughness_texture_index = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.metallicRoughnessTexture.index;
-				material.base_color_factor = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.baseColorFactor;
-				material.metalness_factor = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.metallicFactor;
-				material.roughness_factor = doc_fx.materials[primitive_gltf.material].pbrMetallicRoughness.roughnessFactor;
+				const fx::gltf::Material& material_fx = doc_fx.materials[primitive_gltf.material];
+
+				material.base_color_texture_index = material_fx.pbrMetallicRoughness.baseColorTexture.index;
+				material.metalness_roughness_texture_index = material_fx.pbrMetallicRoughness.metallicRoughnessTexture.index;
+				material.base_color_factor = material_fx.pbrMetallicRoughness.baseColorFactor;
+				material.metalness_factor = material_fx.pbrMetallicRoughness.metallicFactor;
+				material.roughness_factor = material_fx.pbrMetallicRoughness.roughnessFactor;
+				material.double_sided = material_fx.doubleSided;
 			}
 			model.materials.push_back(material);
 
@@ -484,7 +489,7 @@ int main()
 	const int window_height = 720;
 	const float aspect_ratio = window_width / static_cast<float>(window_height);
 
-	camera camera{ { 0, 0, -10 }, {0, 0, 0} };
+	camera camera{ { 0, 0, 10 }, {0, 0, 0} };
 
 	input input{ 0 };
 
@@ -532,7 +537,8 @@ int main()
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
 
-	sp_graphics_pipeline_state_handle gbuffer_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer", {
+	// TODO: The pipeline state should be part of the material. Not sure how we'll make the association though.
+	sp_graphics_pipeline_state_handle gbuffer_single_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer", {
 		gbuffer_vertex_shader_handle,
 		gbuffer_pixel_shader_handle,
 		{
@@ -546,13 +552,32 @@ int main()
 			sp_texture_format::r8g8b8a8,
 			sp_texture_format::r8g8b8a8,
 		},
-		sp_texture_format::d32
+		sp_texture_format::d32,
+		sp_rasterizer_cull_face::back,
+	});
+
+	sp_graphics_pipeline_state_handle gbuffer_double_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer", {
+		gbuffer_vertex_shader_handle,
+		gbuffer_pixel_shader_handle,
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT }
+		},
+		{
+			sp_texture_format::r8g8b8a8,
+			sp_texture_format::r8g8b8a8,
+			sp_texture_format::r8g8b8a8,
+		},
+		sp_texture_format::d32,
+		sp_rasterizer_cull_face::none,
 	});
 
 	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	//model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	model scene = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	//model scene = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 
 	model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
 
@@ -596,7 +621,7 @@ int main()
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, sp_texture_format::r8g8b8a8 });
 	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, sp_texture_format::d32 });
 
-	math::vec<3> sun_direction_ws = math::normalize<3>({ -0.25f, -1.0f, -0.25f });
+	math::vec<3> sun_direction_ws = math::normalize<3>({ 0.25f, -1.0f, -0.5f });
 
 	while (sp_window_poll())
 	{
@@ -638,7 +663,7 @@ int main()
 
 			const math::mat<4> camera_transform = camera_get_transform(camera);
 			const math::mat<4> view_matrix = math::inverse(camera_transform);
-			const math::mat<4> projection_matrix = math::create_perspective_fov_lh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
+			const math::mat<4> projection_matrix = math::create_perspective_fov_rh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
 			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
@@ -664,8 +689,6 @@ int main()
 
 			// gbuffer
 			{
-				command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_pipeline_state_handle));
-
 				sp_texture_handle gbuffer_render_target_handles[] = {
 					gbuffer_base_color_texture_handle,
 					gbuffer_metalness_roughness_texture_handle,
@@ -684,12 +707,23 @@ int main()
 				{
 					{
 						const math::mat<4> world_matrix = math::create_identity<4>();
+
 						constant_buffer_per_object_data.world_matrix = world_matrix;
 
 						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
 					}
 
-					// XXX: This could all be baked per-draw call
+					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
+					if (scene.materials[i].double_sided)
+					{
+						command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_double_sided_pipeline_state_handle));
+					}
+					else
+					{
+						command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_single_sided_pipeline_state_handle));
+					}
+
+					// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
 					// Copy SRV
 					command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(scene.textures[scene.materials[i].base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -712,7 +746,17 @@ int main()
 						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
 					}
 
-					// XXX: This could all be baked per-draw call
+					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
+					if (cube.materials[i].double_sided)
+					{
+						command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_double_sided_pipeline_state_handle));
+					}
+					else
+					{
+						command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_single_sided_pipeline_state_handle));
+					}
+
+					// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
 					// Copy SRV
 					command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[cube.materials[i].base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

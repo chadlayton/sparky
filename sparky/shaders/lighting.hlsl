@@ -230,5 +230,5 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	// lighting = tonemap_uncharted2(lighting);
 
-	return float4(base_color, lighting.r + lighting.g + lighting.b);
+	return float4(lighting, 1.0);
 }

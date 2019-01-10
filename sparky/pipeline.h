@@ -15,6 +15,13 @@ struct sp_input_element_desc
 	DXGI_FORMAT _format;
 };
 
+enum class sp_rasterizer_cull_face
+{
+	front,
+	back,
+	none,
+};
+
 struct sp_graphics_pipeline_state_desc
 {
 	sp_vertex_shader_handle vertex_shader_handle;
@@ -22,6 +29,7 @@ struct sp_graphics_pipeline_state_desc
 	sp_input_element_desc input_layout[D3D12_STANDARD_VERTEX_ELEMENT_COUNT];
 	sp_texture_format render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
 	sp_texture_format depth_stencil_format = sp_texture_format::unknown;
+	sp_rasterizer_cull_face cull_face = sp_rasterizer_cull_face::back;
 };
 
 struct sp_graphics_pipeline_state

@@ -60,20 +60,36 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	pipeline_state_desc.PS = CD3DX12_SHADER_BYTECODE(detail::sp_pixel_shader_pool_get(desc.pixel_shader_handle)._blob.Get());
 	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	pipeline_state_desc.SampleMask = UINT_MAX;
-	pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	pipeline_state_desc.RasterizerState.FrontCounterClockwise = TRUE;
-	if (desc.depth_stencil_format == sp_texture_format::unknown)
+
+	// RasterizerState
 	{
-		pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+		pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		switch (desc.cull_face)
+		{
+		case sp_rasterizer_cull_face::front: pipeline_state_desc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT; break;
+		case sp_rasterizer_cull_face::back:  pipeline_state_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;  break;
+		case sp_rasterizer_cull_face::none:  pipeline_state_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  break;
+		default: assert(false);
+		}
+		pipeline_state_desc.RasterizerState.FrontCounterClockwise = TRUE;
 	}
-	else
+
+	// DepthStencilState
 	{
-		pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
-		pipeline_state_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		pipeline_state_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-		pipeline_state_desc.DSVFormat = detail::sp_texture_format_get_dsv_format_d3d12(desc.depth_stencil_format);
+		if (desc.depth_stencil_format == sp_texture_format::unknown)
+		{
+			pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+		}
+		else
+		{
+			pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
+			pipeline_state_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+			pipeline_state_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+			pipeline_state_desc.DSVFormat = detail::sp_texture_format_get_dsv_format_d3d12(desc.depth_stencil_format);
+		}
+		pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
 	}
-	pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
+
 	pipeline_state_desc.InputLayout = { input_element_desc, input_element_count };
 	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	unsigned render_target_count = 0;
