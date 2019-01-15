@@ -20,6 +20,9 @@ namespace detail
 
 		std::array<sp_pixel_shader, 1024> pixel_shaders;
 		sp_handle_pool pixel_shader_handles;
+
+		std::array<sp_compute_shader, 1024> compute_shaders;
+		sp_handle_pool compute_shader_handles;
 	}
 
 	void sp_vertex_shader_pool_create()
@@ -50,6 +53,21 @@ namespace detail
 	sp_pixel_shader& sp_pixel_shader_pool_get(sp_pixel_shader_handle handle)
 	{
 		return resource_pools::pixel_shaders[handle.index];
+	}
+
+	void sp_compute_shader_pool_create()
+	{
+		sp_handle_pool_create(&resource_pools::compute_shader_handles, static_cast<int>(resource_pools::compute_shaders.size()));
+	}
+
+	void sp_compute_shader_pool_destroy()
+	{
+		sp_handle_pool_destroy(&resource_pools::compute_shader_handles);
+	}
+
+	sp_compute_shader& sp_compute_shader_pool_get(sp_compute_shader_handle handle)
+	{
+		return resource_pools::compute_shaders[handle.index];
 	}
 }
 
@@ -171,6 +189,40 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 			reflection.buffers.push_back(constant_buffer_reflection);
 		}
 	}
+
+	return shader_handle;
+}
+
+sp_compute_shader_handle sp_compute_shader_create(const sp_compute_shader_desc& desc)
+{
+	sp_compute_shader_handle shader_handle = sp_handle_alloc(&detail::resource_pools::compute_shader_handles);
+	sp_compute_shader& shader = detail::resource_pools::compute_shaders[shader_handle.index];
+
+	UINT compile_flags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR; // XXX: Would be nice for performance if matrices were row major alread
+
+#if defined(_DEBUG)
+	compile_flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
+#endif
+
+	ID3DBlob* error_blob = nullptr;
+	HRESULT hr = D3DCompileFromFile(
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
+		nullptr,
+		nullptr,
+		"cs_main",
+		"cs_5_1",
+		compile_flags,
+		0,
+		&shader._blob,
+		&error_blob);
+
+	if (error_blob)
+	{
+		OutputDebugStringA(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+		error_blob->Release();
+	}
+
+	assert(SUCCEEDED(hr));
 
 	return shader_handle;
 }

@@ -14,6 +14,11 @@ struct sp_graphics_command_list_desc
 	sp_graphics_pipeline_state_handle pipeline_state_handle;
 };
 
+struct sp_compute_command_list_desc
+{
+	sp_compute_pipeline_state_handle pipeline_state_handle;
+};
+
 struct sp_graphics_command_list
 {
 	const char* _name;
@@ -22,6 +27,13 @@ struct sp_graphics_command_list
 
 	D3D12_RESOURCE_BARRIER _resource_transition_records[64];
 	int _resource_transition_records_count = 0;
+};
+
+struct sp_compute_command_list
+{
+	const char* _name;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> _command_list_d3d12;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _command_allocator_d3d12;
 };
 
 struct sp_viewport
@@ -37,6 +49,7 @@ struct sp_scissor_rect
 };
 
 sp_graphics_command_list sp_graphics_command_list_create(const char* name, const sp_graphics_command_list_desc& desc);
+sp_compute_command_list sp_compute_command_list_create(const char* name, const sp_compute_command_list_desc& desc);
 void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_reset(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_reset(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle);
@@ -50,3 +63,6 @@ void sp_graphics_command_list_clear_depth_stencil(sp_graphics_command_list& comm
 void sp_graphics_command_list_clear_depth(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle);
 void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle);
 void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_list, int vertex_count, int instance_count);
+void sp_compute_command_list_close(sp_compute_command_list& command_list);
+void sp_compute_command_list_dispatch(sp_compute_command_list& command_list, int thread_group_count_x, int thread_group_count_y, int thread_group_count_z);
+void sp_compute_command_list_reset(sp_compute_command_list& command_list);

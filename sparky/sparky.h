@@ -192,11 +192,14 @@ void sp_init(const sp_window& window)
 		range_srv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 		CD3DX12_DESCRIPTOR_RANGE1 range_cbv;
 		range_cbv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
+		CD3DX12_DESCRIPTOR_RANGE1 range_uav;
+		range_uav.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
 		// TODO: Hardcoded
-		CD3DX12_ROOT_PARAMETER1 root_parameters[2];
+		CD3DX12_ROOT_PARAMETER1 root_parameters[3];
 		root_parameters[0].InitAsDescriptorTable(1, &range_srv, D3D12_SHADER_VISIBILITY_ALL);
 		root_parameters[1].InitAsDescriptorTable(1, &range_cbv, D3D12_SHADER_VISIBILITY_ALL);
+		root_parameters[2].InitAsDescriptorTable(1, &range_uav, D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -240,9 +243,11 @@ void sp_init(const sp_window& window)
 	detail::sp_texture_pool_create();
 	detail::sp_vertex_buffer_pool_create();
 	detail::sp_graphics_pipeline_state_pool_create();
+	detail::sp_compute_pipeline_state_pool_create();
 	detail::sp_constant_buffer_pool_create();
 	detail::sp_pixel_shader_pool_create();
 	detail::sp_vertex_shader_pool_create();
+	detail::sp_compute_shader_pool_create();
 
 	detail::sp_texture_defaults_create();
 
@@ -287,9 +292,11 @@ void sp_shutdown()
 	detail::sp_texture_pool_destroy();
 	detail::sp_vertex_buffer_pool_destroy();
 	detail::sp_graphics_pipeline_state_pool_destroy();
+	detail::sp_compute_pipeline_state_pool_destroy();
 	detail::sp_constant_buffer_pool_destroy();
 	detail::sp_pixel_shader_pool_destroy();
 	detail::sp_vertex_shader_pool_destroy();
+	detail::sp_compute_shader_pool_destroy();
 
 	sp_descriptor_heap_destroy(&_sp._descriptor_heap_dsv_cpu);
 	sp_descriptor_heap_destroy(&_sp._descriptor_heap_rtv_cpu);

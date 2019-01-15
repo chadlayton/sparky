@@ -41,7 +41,51 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 	return command_list;
 }
 
+sp_compute_command_list sp_compute_command_list_create(const char* name, const sp_compute_command_list_desc& desc)
+{
+	sp_compute_command_list command_list;
+
+	HRESULT hr = _sp._device->CreateCommandAllocator(
+		D3D12_COMMAND_LIST_TYPE_COMPUTE,
+		IID_PPV_ARGS(&command_list._command_allocator_d3d12));
+	assert(SUCCEEDED(hr));
+
+#if SP_DEBUG_RESOURCE_NAMING_ENABLED
+	command_list._command_allocator_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+#endif
+
+	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
+	if (desc.pipeline_state_handle)
+	{
+		pipeline_state_d3d12 = sp_graphics_pipeline_state_get_impl(desc.pipeline_state_handle);
+	}
+
+	hr = _sp._device->CreateCommandList(
+		0,
+		D3D12_COMMAND_LIST_TYPE_COMPUTE,
+		command_list._command_allocator_d3d12.Get(),
+		pipeline_state_d3d12,
+		IID_PPV_ARGS(&command_list._command_list_d3d12));
+	assert(SUCCEEDED(hr));
+
+#if SP_DEBUG_RESOURCE_NAMING_ENABLED
+	command_list._command_list_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+#endif
+
+	command_list._name = name;
+
+	return command_list;
+}
+
+
 void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list)
+{
+	command_list._name = nullptr;
+	command_list._command_list_d3d12.Reset();
+	command_list._command_allocator_d3d12.Reset();
+}
+
+void sp_compute_command_list_destroy(sp_compute_command_list& command_list)
 {
 	command_list._name = nullptr;
 	command_list._command_list_d3d12.Reset();
@@ -229,4 +273,25 @@ void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_li
 void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_list, int vertex_count, int instance_count)
 {
 	command_list._command_list_d3d12->DrawInstanced(vertex_count, instance_count, 0, 0);
+}
+
+void sp_compute_command_list_close(sp_compute_command_list& command_list)
+{
+	command_list._command_list_d3d12->Close();
+}
+
+void sp_compute_command_list_dispatch(sp_compute_command_list& command_list, int thread_group_count_x, int thread_group_count_y, int thread_group_count_z)
+{
+	command_list._command_list_d3d12->Dispatch(thread_group_count_x, thread_group_count_y, thread_group_count_z);
+}
+
+void sp_compute_command_list_reset(sp_compute_command_list& command_list)
+{
+	HRESULT hr = command_list._command_allocator_d3d12->Reset();
+	assert(SUCCEEDED(hr));
+
+	hr = command_list._command_list_d3d12->Reset(
+		command_list._command_allocator_d3d12.Get(),
+		nullptr);
+	assert(SUCCEEDED(hr));
 }

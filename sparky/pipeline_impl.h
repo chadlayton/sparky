@@ -17,6 +17,9 @@ namespace detail
 	{
 		std::array<sp_graphics_pipeline_state, 1024> graphics_pipelines;
 		sp_handle_pool graphics_pipeline_handles;
+
+		std::array<sp_compute_pipeline_state, 1024> compute_pipelines;
+		sp_handle_pool compute_pipeline_handles;
 	}
 
 	void sp_graphics_pipeline_state_pool_create()
@@ -24,9 +27,19 @@ namespace detail
 		sp_handle_pool_create(&resource_pools::graphics_pipeline_handles, static_cast<int>(resource_pools::graphics_pipelines.size()));
 	}
 
+	void sp_compute_pipeline_state_pool_create()
+	{
+		sp_handle_pool_create(&resource_pools::compute_pipeline_handles, static_cast<int>(resource_pools::compute_pipelines.size()));
+	}
+
 	void sp_graphics_pipeline_state_pool_destroy()
 	{
 		sp_handle_pool_destroy(&resource_pools::graphics_pipeline_handles);
+	}
+
+	void sp_compute_pipeline_state_pool_destroy()
+	{
+		sp_handle_pool_destroy(&resource_pools::compute_pipeline_handles);
 	}
 }
 
@@ -54,44 +67,44 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 		input_element_desc[input_element_count].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	}
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
-	pipeline_state_desc.pRootSignature = _sp._root_signature.Get();
-	pipeline_state_desc.VS = CD3DX12_SHADER_BYTECODE(detail::sp_vertex_shader_pool_get(desc.vertex_shader_handle)._blob.Get());
-	pipeline_state_desc.PS = CD3DX12_SHADER_BYTECODE(detail::sp_pixel_shader_pool_get(desc.pixel_shader_handle)._blob.Get());
-	pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	pipeline_state_desc.SampleMask = UINT_MAX;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc_d3d12 = {};
+	pipeline_state_desc_d3d12.pRootSignature = _sp._root_signature.Get();
+	pipeline_state_desc_d3d12.VS = CD3DX12_SHADER_BYTECODE(detail::sp_vertex_shader_pool_get(desc.vertex_shader_handle)._blob.Get());
+	pipeline_state_desc_d3d12.PS = CD3DX12_SHADER_BYTECODE(detail::sp_pixel_shader_pool_get(desc.pixel_shader_handle)._blob.Get());
+	pipeline_state_desc_d3d12.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	pipeline_state_desc_d3d12.SampleMask = UINT_MAX;
 
 	// RasterizerState
 	{
-		pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		pipeline_state_desc_d3d12.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		switch (desc.cull_face)
 		{
-		case sp_rasterizer_cull_face::front: pipeline_state_desc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT; break;
-		case sp_rasterizer_cull_face::back:  pipeline_state_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;  break;
-		case sp_rasterizer_cull_face::none:  pipeline_state_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  break;
+		case sp_rasterizer_cull_face::front: pipeline_state_desc_d3d12.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT; break;
+		case sp_rasterizer_cull_face::back:  pipeline_state_desc_d3d12.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;  break;
+		case sp_rasterizer_cull_face::none:  pipeline_state_desc_d3d12.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  break;
 		default: assert(false);
 		}
-		pipeline_state_desc.RasterizerState.FrontCounterClockwise = TRUE;
+		pipeline_state_desc_d3d12.RasterizerState.FrontCounterClockwise = TRUE;
 	}
 
 	// DepthStencilState
 	{
 		if (desc.depth_stencil_format == sp_texture_format::unknown)
 		{
-			pipeline_state_desc.DepthStencilState.DepthEnable = FALSE;
+			pipeline_state_desc_d3d12.DepthStencilState.DepthEnable = FALSE;
 		}
 		else
 		{
-			pipeline_state_desc.DepthStencilState.DepthEnable = TRUE;
-			pipeline_state_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-			pipeline_state_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-			pipeline_state_desc.DSVFormat = detail::sp_texture_format_get_dsv_format_d3d12(desc.depth_stencil_format);
+			pipeline_state_desc_d3d12.DepthStencilState.DepthEnable = TRUE;
+			pipeline_state_desc_d3d12.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+			pipeline_state_desc_d3d12.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+			pipeline_state_desc_d3d12.DSVFormat = detail::sp_texture_format_get_dsv_format_d3d12(desc.depth_stencil_format);
 		}
-		pipeline_state_desc.DepthStencilState.StencilEnable = FALSE;
+		pipeline_state_desc_d3d12.DepthStencilState.StencilEnable = FALSE;
 	}
 
-	pipeline_state_desc.InputLayout = { input_element_desc, input_element_count };
-	pipeline_state_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	pipeline_state_desc_d3d12.InputLayout = { input_element_desc, input_element_count };
+	pipeline_state_desc_d3d12.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	unsigned render_target_count = 0;
 	for (; render_target_count < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++render_target_count)
 	{
@@ -100,12 +113,12 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 			break;
 		}
 
-		pipeline_state_desc.RTVFormats[render_target_count] = detail::sp_texture_format_get_srv_format_d3d12(desc.render_target_formats[render_target_count]);
+		pipeline_state_desc_d3d12.RTVFormats[render_target_count] = detail::sp_texture_format_get_srv_format_d3d12(desc.render_target_formats[render_target_count]);
 	}
-	pipeline_state_desc.NumRenderTargets = render_target_count;
-	pipeline_state_desc.SampleDesc.Count = 1;
+	pipeline_state_desc_d3d12.NumRenderTargets = render_target_count;
+	pipeline_state_desc_d3d12.SampleDesc.Count = 1;
 
-	HRESULT hr = _sp._device->CreateGraphicsPipelineState(&pipeline_state_desc, IID_PPV_ARGS(&pipeline_state._impl));
+	HRESULT hr = _sp._device->CreateGraphicsPipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state._impl));
 	assert(SUCCEEDED(hr));
 
 #if SP_DEBUG_RESOURCE_NAMING_ENABLED
@@ -115,12 +128,52 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	return pipeline_state_handle;
 }
 
-void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_handle)
+sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc)
 {
+	sp_compute_pipeline_state_handle pipeline_state_handle = sp_handle_alloc(&detail::resource_pools::compute_pipeline_handles);
+	sp_compute_pipeline_state& pipeline_state = detail::resource_pools::compute_pipelines[pipeline_state_handle.index];
 
+	pipeline_state._name = name;
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc_d3d12 = {};
+	pipeline_state_desc_d3d12.pRootSignature = _sp._root_signature.Get();
+	pipeline_state_desc_d3d12.CS = CD3DX12_SHADER_BYTECODE(detail::sp_compute_shader_pool_get(desc.compute_shader_handle)._blob.Get());
+	HRESULT hr = _sp._device->CreateComputePipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state._impl));
+	assert(SUCCEEDED(hr));
+
+#if SP_DEBUG_RESOURCE_NAMING_ENABLED
+	pipeline_state._impl->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+#endif
+
+	return pipeline_state_handle;
+}
+
+void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle)
+{
+	sp_graphics_pipeline_state& pipeline_state = detail::resource_pools::graphics_pipelines[pipeline_state_handle.index];
+
+	pipeline_state._name = nullptr;
+	pipeline_state._impl.Reset();
+
+	sp_handle_free(&detail::resource_pools::graphics_pipeline_handles, pipeline_state_handle);
+}
+
+void sp_compute_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle)
+{
+	sp_compute_pipeline_state& pipeline_state = detail::resource_pools::compute_pipelines[pipeline_state_handle.index];
+
+	pipeline_state._name = nullptr;
+	pipeline_state._impl.Reset();
+
+	sp_handle_free(&detail::resource_pools::compute_pipeline_handles, pipeline_state_handle);
 }
 
 ID3D12PipelineState* sp_graphics_pipeline_state_get_impl(const sp_graphics_pipeline_state_handle& pipeline_handle)
 {
 	return detail::resource_pools::graphics_pipelines[pipeline_handle.index]._impl.Get();
+}
+
+ID3D12PipelineState* sp_compute_pipeline_state_get_impl(const sp_compute_pipeline_state_handle& pipeline_handle)
+{
+	return detail::resource_pools::compute_pipelines[pipeline_handle.index]._impl.Get();
 }

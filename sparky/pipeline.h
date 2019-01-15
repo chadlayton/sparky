@@ -32,20 +32,37 @@ struct sp_graphics_pipeline_state_desc
 	sp_rasterizer_cull_face cull_face = sp_rasterizer_cull_face::back;
 };
 
+struct sp_compute_pipeline_state_desc
+{
+	sp_compute_shader_handle compute_shader_handle;
+};
+
 struct sp_graphics_pipeline_state
 {
 	const char* _name;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
 };
 
+struct sp_compute_pipeline_state
+{
+	const char* _name;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
+};
+
 using sp_graphics_pipeline_state_handle = sp_handle;
+using sp_compute_pipeline_state_handle = sp_handle;
 
 namespace detail
 {
 	void sp_graphics_pipeline_state_pool_create();
+	void sp_compute_pipeline_state_pool_create();
 	void sp_graphics_pipeline_state_pool_destroy();
+	void sp_compute_pipeline_state_pool_destroy();
 }
 
 sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* name, const sp_graphics_pipeline_state_desc& desc);
-void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_handle);
-ID3D12PipelineState* sp_graphics_pipeline_state_get_impl(const sp_graphics_pipeline_state_handle& pipeline_handle);
+sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc);
+void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
+void sp_compute_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
+ID3D12PipelineState* sp_graphics_pipeline_state_get_impl(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
+ID3D12PipelineState* sp_compute_pipeline_state_get_impl(const sp_compute_pipeline_state_handle& pipeline_state_handle);
