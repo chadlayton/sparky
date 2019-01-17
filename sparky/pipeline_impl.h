@@ -41,6 +41,16 @@ namespace detail
 	{
 		sp_handle_pool_destroy(&resource_pools::compute_pipeline_handles);
 	}
+
+	sp_graphics_pipeline_state& sp_graphics_pipeline_state_pool_get(const sp_graphics_pipeline_state_handle& pipeline_handle)
+	{
+		return detail::resource_pools::graphics_pipelines[pipeline_handle.index];
+	}
+
+	sp_compute_pipeline_state& sp_compute_pipeline_state_pool_get(const sp_compute_pipeline_state_handle& pipeline_handle)
+	{
+		return detail::resource_pools::compute_pipelines[pipeline_handle.index];
+	}
 }
 
 sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* name, const sp_graphics_pipeline_state_desc& desc)
@@ -166,14 +176,4 @@ void sp_compute_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& 
 	pipeline_state._impl.Reset();
 
 	sp_handle_free(&detail::resource_pools::compute_pipeline_handles, pipeline_state_handle);
-}
-
-ID3D12PipelineState* sp_graphics_pipeline_state_get_impl(const sp_graphics_pipeline_state_handle& pipeline_handle)
-{
-	return detail::resource_pools::graphics_pipelines[pipeline_handle.index]._impl.Get();
-}
-
-ID3D12PipelineState* sp_compute_pipeline_state_get_impl(const sp_compute_pipeline_state_handle& pipeline_handle)
-{
-	return detail::resource_pools::compute_pipelines[pipeline_handle.index]._impl.Get();
 }

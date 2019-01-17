@@ -492,6 +492,21 @@ struct sp_render_pass_desc
 	sp_texture_handle depth_stencil_buffer_handle;
 };
 
+/*
+
+	sp_render_pass render_pass;
+	sp_material material;
+	
+	// ...
+	sp_graphics_pipeline_handle handle = sp_graphics_pipeline_lookup(render_pass.state, material.state);
+	if (!handle)
+	{
+		handle = sp_graphics_pipeline_create( {render_pass.state, material.state } );
+	}
+
+	sp_graphics_command_list_set_pipeline_state(handle);
+*/
+
 int main()
 {
 	const int window_width = 1280;
@@ -712,7 +727,7 @@ int main()
 			sp_graphics_command_list_set_scissor_rect(graphics_command_list, { 0, 0, window_width, window_height });
 
 			{
-				compute_command_list._command_list_d3d12->SetPipelineState(sp_compute_pipeline_state_get_impl(low_freq_noise_pipeline_state_handle));
+				sp_compute_command_list_set_pipeline_state(compute_command_list, low_freq_noise_pipeline_state_handle);
 				sp_compute_command_list_dispatch(compute_command_list, 8, 8, 8);
 			}
 
@@ -745,11 +760,11 @@ int main()
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
 					if (scene.materials[i].double_sided)
 					{
-						graphics_command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_double_sided_pipeline_state_handle));
+						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_double_sided_pipeline_state_handle);
 					}
 					else
 					{
-						graphics_command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_single_sided_pipeline_state_handle));
+						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_single_sided_pipeline_state_handle);
 					}
 
 					// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
@@ -776,13 +791,13 @@ int main()
 					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
-					if (cube.materials[i].double_sided)
+					if (scene.materials[i].double_sided)
 					{
-						graphics_command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_double_sided_pipeline_state_handle));
+						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_double_sided_pipeline_state_handle);
 					}
 					else
 					{
-						graphics_command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(gbuffer_single_sided_pipeline_state_handle));
+						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_single_sided_pipeline_state_handle);
 					}
 
 					// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
@@ -802,7 +817,8 @@ int main()
 
 			// lighting
 			{
-				graphics_command_list._command_list_d3d12->SetPipelineState(sp_graphics_pipeline_state_get_impl(lighting_pipeline_state_handle));
+
+				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
 
 				sp_texture_handle lighting_render_target_handles[] = {
 					_sp._back_buffer_texture_handles[back_buffer_index]
@@ -846,6 +862,7 @@ int main()
 
 		sp_swap_chain_present();
 
+		// TODO: Need to double buffer command lists/heaps/etc so we can start recording next frame immediately.
 		sp_device_wait_for_idle();
 
 		sp_graphics_command_list_reset(graphics_command_list);

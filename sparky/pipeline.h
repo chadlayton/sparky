@@ -58,11 +58,11 @@ namespace detail
 	void sp_compute_pipeline_state_pool_create();
 	void sp_graphics_pipeline_state_pool_destroy();
 	void sp_compute_pipeline_state_pool_destroy();
+	sp_graphics_pipeline_state& sp_graphics_pipeline_state_pool_get(const sp_graphics_pipeline_state_handle& pipeline_handle);
+	sp_compute_pipeline_state& sp_compute_pipeline_state_pool_get(const sp_compute_pipeline_state_handle& pipeline_handle);
 }
 
 sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* name, const sp_graphics_pipeline_state_desc& desc);
 sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc);
 void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
 void sp_compute_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
-ID3D12PipelineState* sp_graphics_pipeline_state_get_impl(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
-ID3D12PipelineState* sp_compute_pipeline_state_get_impl(const sp_compute_pipeline_state_handle& pipeline_state_handle);

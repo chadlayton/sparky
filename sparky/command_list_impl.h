@@ -21,7 +21,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
 	if (desc.pipeline_state_handle)
 	{
-		pipeline_state_d3d12 = sp_graphics_pipeline_state_get_impl(desc.pipeline_state_handle);
+		pipeline_state_d3d12 = detail::sp_graphics_pipeline_state_pool_get(desc.pipeline_state_handle)._impl.Get();
 	}
 
 	hr = _sp._device->CreateCommandList(
@@ -57,7 +57,7 @@ sp_compute_command_list sp_compute_command_list_create(const char* name, const s
 	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
 	if (desc.pipeline_state_handle)
 	{
-		pipeline_state_d3d12 = sp_graphics_pipeline_state_get_impl(desc.pipeline_state_handle);
+		pipeline_state_d3d12 = detail::sp_compute_pipeline_state_pool_get(desc.pipeline_state_handle)._impl.Get();
 	}
 
 	hr = _sp._device->CreateCommandList(
@@ -110,7 +110,7 @@ void sp_graphics_command_list_reset(sp_graphics_command_list& command_list, cons
 
 	hr = command_list._command_list_d3d12->Reset(
 		command_list._command_allocator_d3d12.Get(),
-		sp_graphics_pipeline_state_get_impl(pipeline_state_handle));
+		detail::sp_compute_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
 	assert(SUCCEEDED(hr));
 }
 
@@ -275,6 +275,11 @@ void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_l
 	command_list._command_list_d3d12->DrawInstanced(vertex_count, instance_count, 0, 0);
 }
 
+void sp_graphics_command_list_set_pipeline_state(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle)
+{
+	command_list._command_list_d3d12->SetPipelineState(detail::sp_graphics_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
+}
+
 void sp_compute_command_list_close(sp_compute_command_list& command_list)
 {
 	command_list._command_list_d3d12->Close();
@@ -294,4 +299,9 @@ void sp_compute_command_list_reset(sp_compute_command_list& command_list)
 		command_list._command_allocator_d3d12.Get(),
 		nullptr);
 	assert(SUCCEEDED(hr));
+}
+
+void sp_compute_command_list_set_pipeline_state(sp_compute_command_list& command_list, const sp_compute_pipeline_state_handle& pipeline_state_handle)
+{
+	command_list._command_list_d3d12->SetPipelineState(detail::sp_compute_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
 }
