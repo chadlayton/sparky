@@ -791,7 +791,7 @@ int main()
 					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
-					if (scene.materials[i].double_sided)
+					if (cube.materials[i].double_sided)
 					{
 						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_double_sided_pipeline_state_handle);
 					}
