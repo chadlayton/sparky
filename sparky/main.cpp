@@ -622,6 +622,7 @@ int main()
 
 	__declspec(align(16)) struct
 	{
+		math::mat<4> view_matrix;
 		math::mat<4> projection_matrix;
 		math::mat<4> view_projection_matrix;
 		math::mat<4> inverse_view_projection_matrix;
@@ -704,6 +705,7 @@ int main()
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
 			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
+			constant_buffer_per_frame_data.view_matrix = view_matrix;
 			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
 			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
 			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);

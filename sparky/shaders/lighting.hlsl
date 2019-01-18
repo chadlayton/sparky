@@ -10,6 +10,7 @@ static const float EPSILON = 1e-10;
 
 cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_material, etc
 {
+	float4x4 view_matrix;
 	float4x4 projection_matrix;
 	float4x4 view_projection_matrix;
 	float4x4 inverse_view_projection_matrix;
@@ -27,6 +28,36 @@ struct vs_output
 	float4 position_cs : SV_Position;
 	float2 texcoord : TEXCOORD;
 };
+
+float4x4 inverse(float4x4 input)
+{
+#define minor(a,b,c) determinant(float3x3(input.a, input.b, input.c))
+	//determinant(float3x3(input._22_23_23, input._32_33_34, input._42_43_44))
+
+	float4x4 cofactors = float4x4(
+		minor(_22_23_24, _32_33_34, _42_43_44),
+		-minor(_21_23_24, _31_33_34, _41_43_44),
+		minor(_21_22_24, _31_32_34, _41_42_44),
+		-minor(_21_22_23, _31_32_33, _41_42_43),
+
+		-minor(_12_13_14, _32_33_34, _42_43_44),
+		minor(_11_13_14, _31_33_34, _41_43_44),
+		-minor(_11_12_14, _31_32_34, _41_42_44),
+		minor(_11_12_13, _31_32_33, _41_42_43),
+
+		minor(_12_13_14, _22_23_24, _42_43_44),
+		-minor(_11_13_14, _21_23_24, _41_43_44),
+		minor(_11_12_14, _21_22_24, _41_42_44),
+		-minor(_11_12_13, _21_22_23, _41_42_43),
+
+		-minor(_12_13_14, _22_23_24, _32_33_34),
+		minor(_11_13_14, _21_23_24, _31_33_34),
+		-minor(_11_12_14, _21_22_24, _31_32_34),
+		minor(_11_12_13, _21_22_23, _31_32_33)
+		);
+#undef minor
+	return transpose(cofactors) / determinant(input);
+}
 
 // http://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau
 void fullscreen_triangle_cw(in uint vertex_id, out float4 position_cs, out float2 texcoord)
@@ -53,13 +84,28 @@ void fullscreen_triangle_ccw(in uint vertex_id, out float4 position_cs, out floa
 	texcoord.y = 1.0f - (float)((2 - vertex_id) % 2) * 2.0f;
 }
 
+// https://mynameismjp.wordpress.com/2010/09/05/position-from-depth-3/
 float3 position_ws_from_depth(in float depth_post_projection, in float2 texcoord)
 {
 	float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
-	float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 1.0f);
+	float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 0.0f);
 	position_cs.y *= -1.0f;
-	float4 position_ws = mul(inverse_view_projection_matrix, position_cs);
-	return position_ws.xyz / position_ws.w;
+	float4 position_ws = mul(inverse(view_projection_matrix), position_cs);
+	return position_ws.xyz / position_ws.z;
+
+	//float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
+	//float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 0.0f);
+	//position_cs.y *= -1.0f;
+	//float4 position_ws = mul(inverse(mul(view_matrix, projection_matrix)), position_cs);
+	//return position_ws.xyz / position_ws.z;
+
+	//float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
+	//float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 1.0f);
+	//position_cs.y *= -1.0f;
+	//float4 position_vs = mul(inverse(projection_matrix), position_cs);
+	//position_vs /= position_vs.w;
+	//float4 position_ws = mul(inverse(view_matrix), position_vs);
+	//return position_ws.xyz;
 }
 
 vs_output vs_main(vs_input input)
@@ -205,6 +251,8 @@ float4 ps_main(ps_input input) : SV_Target0
 	float3 V = direction_to_camera_ws;
 
 	float n_dot_v = saturate(dot(N, V));
+
+	return float4(abs(dot(N, V)), abs(dot(N, V)), abs(dot(N, V)), 1.0);
 
 	float3 indirect_lighting = float3(0.1, 0.1, 0.2);
 
