@@ -625,11 +625,14 @@ int main()
 		math::mat<4> view_matrix;
 		math::mat<4> projection_matrix;
 		math::mat<4> view_projection_matrix;
+		math::mat<4> inverse_view_matrix;
+		math::mat<4> inverse_projection_matrix;
 		math::mat<4> inverse_view_projection_matrix;
 		math::vec<3> camera_position_ws;
 		float dummy;
 		// TODO: Not sure if I want this in scene constants or a seprate lighting constants
 		math::vec<3> sun_direction_ws;
+		float dummy2;
 
 	} constant_buffer_per_frame_data;
 
@@ -703,11 +706,12 @@ int main()
 			const math::mat<4> view_matrix = math::inverse(camera_transform);
 			const math::mat<4> projection_matrix = math::create_perspective_fov_rh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
-			const math::mat<4> inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 
 			constant_buffer_per_frame_data.view_matrix = view_matrix;
 			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
 			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
+			constant_buffer_per_frame_data.inverse_view_matrix = math::inverse(view_matrix);
+			constant_buffer_per_frame_data.inverse_projection_matrix = math::inverse(projection_matrix);
 			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 			constant_buffer_per_frame_data.camera_position_ws = camera.position;
 			constant_buffer_per_frame_data.sun_direction_ws = sun_direction_ws;
@@ -787,6 +791,7 @@ int main()
 				{
 					{
 						const math::mat<4> world_matrix = math::create_identity<4>();
+
 						constant_buffer_per_object_data.world_matrix = world_matrix;
 
 						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));

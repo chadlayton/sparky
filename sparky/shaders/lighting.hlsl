@@ -13,6 +13,8 @@ cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_materia
 	float4x4 view_matrix;
 	float4x4 projection_matrix;
 	float4x4 view_projection_matrix;
+	float4x4 inverse_view_matrix;
+	float4x4 inverse_projection_matrix;
 	float4x4 inverse_view_projection_matrix;
 	float3 camera_position_ws;
 	float3 sun_direction_ws;
@@ -88,24 +90,10 @@ void fullscreen_triangle_ccw(in uint vertex_id, out float4 position_cs, out floa
 float3 position_ws_from_depth(in float depth_post_projection, in float2 texcoord)
 {
 	float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
-	float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 0.0f);
+	float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 1.0f);
 	position_cs.y *= -1.0f;
-	float4 position_ws = mul(inverse(view_projection_matrix), position_cs);
-	return position_ws.xyz / position_ws.z;
-
-	//float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
-	//float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 0.0f);
-	//position_cs.y *= -1.0f;
-	//float4 position_ws = mul(inverse(mul(view_matrix, projection_matrix)), position_cs);
-	//return position_ws.xyz / position_ws.z;
-
-	//float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
-	//float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 1.0f);
-	//position_cs.y *= -1.0f;
-	//float4 position_vs = mul(inverse(projection_matrix), position_cs);
-	//position_vs /= position_vs.w;
-	//float4 position_ws = mul(inverse(view_matrix), position_vs);
-	//return position_ws.xyz;
+	float4 position_ws = mul(position_cs, inverse_view_projection_matrix);
+	return position_ws.xyz / position_ws.w;
 }
 
 vs_output vs_main(vs_input input)
@@ -242,7 +230,7 @@ float4 ps_main(ps_input input) : SV_Target0
 	float disney_roughness = metalness_roughness.g * metalness_roughness.g;
 	float3 normal_ws = gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1;
 	float3 position_ws = position_ws_from_depth(depth, input.texcoord);
-	float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws);
+	float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws.xyz);
 
 	float3 diffuse_color = base_color * (1.0f - metalness);
 	float3 specular_color = lerp(0.04f, base_color, metalness);
@@ -251,8 +239,6 @@ float4 ps_main(ps_input input) : SV_Target0
 	float3 V = direction_to_camera_ws;
 
 	float n_dot_v = saturate(dot(N, V));
-
-	return float4(abs(dot(N, V)), abs(dot(N, V)), abs(dot(N, V)), 1.0);
 
 	float3 indirect_lighting = float3(0.1, 0.1, 0.2);
 

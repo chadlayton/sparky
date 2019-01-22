@@ -581,16 +581,17 @@ namespace math
 		const vec<3>& eye,
 		const vec<3>& up)
 	{
-		const vec<3> forward = normalize(eye - at);
-		const vec<3> right = normalize(cross(up, forward));
-		const vec<3> new_up = cross(forward, right);
+		const vec<3> forward = normalize(at - eye);
+		const vec<3> right = normalize(cross(forward, up));
+		const vec<3> new_up = cross(right, forward);
 		return{
-			vec<4>(right.x, new_up.x, forward.x, 0),
-			vec<4>(right.y, new_up.y, forward.y, 0),
-			vec<4>(right.z, new_up.z, forward.z, 0),
-			vec<4>({ dot(right, eye), dot(up, eye), dot(forward, eye) }, 1) };
+			vec<4>(right.x, new_up.x, -forward.x, 0),
+			vec<4>(right.y, new_up.y, -forward.y, 0),
+			vec<4>(right.z, new_up.z, -forward.z, 0),
+			vec<4>({ -dot(right, eye), -dot(up, eye), dot(forward, eye) }, 1) };
 	}
 
+	// Assumes Direct3D style clip space where Z ranges from 0 to 1
 	inline mat<4> create_perspective_fov_rh(
 		float fovy,
 		float aspect,
@@ -600,16 +601,16 @@ namespace math
 		// The width and height of the view volume at the near plane
 		const float height = 1 / std::tan(fovy / 2);
 		const float width = height / aspect;
-		const float zdist = (znear - zfar);
-		const float zfar_per_zdist = zfar / zdist;
+		const float range = zfar / (znear - zfar);
 		return {
 			{ width, 0, 0, 0 },
 			{ 0, height, 0, 0 },
-			{ 0, 0, zfar_per_zdist, -1 },
-			{ 0, 0, 2.0f * znear * zfar_per_zdist, 0 }
+			{ 0, 0, range, -1 },
+			{ 0, 0, range * znear, 0 }
 		};
 	}
 
+	// Assumes Direct3D style clip space where Z ranges from 0 to 1
 	inline mat<4> create_perspective_fov_lh(
 		float fovy,
 		float aspect,
@@ -619,13 +620,12 @@ namespace math
 		// The width and height of the view volume at the near plane
 		const float height = 1 / std::tan(fovy / 2);
 		const float width = height / aspect;
-		const float zdist = (znear - zfar);
-		const float zfar_per_zdist = zfar / zdist;
+		const float range = zfar / (zfar - znear);
 		return {
 			{ width, 0, 0, 0 },
 			{ 0, height, 0, 0 },
-			{ 0, 0, -zfar_per_zdist, 1 },
-			{ 0, 0, 2.0f * znear * zfar_per_zdist, 0 }
+			{ 0, 0, range, 1 },
+			{ 0, 0, -range * znear, 0 }
 		};
 	}
 
