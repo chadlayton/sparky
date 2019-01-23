@@ -86,7 +86,7 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 	HRESULT hr = D3DCompileFromFile(
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
 		nullptr,
-		nullptr,
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"vs_main",
 		"vs_5_1",
 		compile_flags,
@@ -137,7 +137,7 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 	HRESULT hr = D3DCompileFromFile(
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
 		nullptr,
-		nullptr,
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"ps_main",
 		"ps_5_1",
 		compile_flags,
@@ -208,7 +208,7 @@ sp_compute_shader_handle sp_compute_shader_create(const sp_compute_shader_desc& 
 	HRESULT hr = D3DCompileFromFile(
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
 		nullptr,
-		nullptr,
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"cs_main",
 		"cs_5_1",
 		compile_flags,
