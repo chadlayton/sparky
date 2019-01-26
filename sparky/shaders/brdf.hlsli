@@ -1,6 +1,14 @@
+#define BRDF_SPECULAR_D_GGX      0
+
+#define BRDF_SPECULAR_F_NONE     0
+#define BRDF_SPECULAR_F_SCHLICK  1
+
+#define BRDF_SPECULAR_V_IMPLICIT 0
+#define BRDF_SPECULAR_V_GGX      1
+
 #define BRDF_SPECULAR_D BRDF_SPECULAR_D_GGX
-#define BRDF_SPECULAR_F BRDF_SPECULAR_F_SHCLICK 
-#define BRDF_SPECULAR_V BRDF_SPECULAR_V_IMPLICIT
+#define BRDF_SPECULAR_F BRDF_SPECULAR_F_SCHLICK 
+#define BRDF_SPECULAR_V BRDF_SPECULAR_V_GGX
 
 /**
 * The Fresnel reflectance function F. Computes the fraction of incoming light that
@@ -17,10 +25,10 @@
 */
 float3 fresnel(float3 f0, float l_dot_h)
 {
-#if BRDF_SPECULAR_F == BRDF_SPECULAR_F_SHLICK
-	return f0 + (1.0f - f0) * pow(1.0f - l_dot_h, 5);
-#elif BRDF_SPECULAR_F == BRDF_SPECULAR_F_NONE
+#if BRDF_SPECULAR_F == BRDF_SPECULAR_F_NONE
 	return f0;
+#elif BRDF_SPECULAR_F == BRDF_SPECULAR_F_SCHLICK
+	return f0 + (1.0f - f0) * pow(1.0f - l_dot_h, 5);
 #endif
 }
 
@@ -32,21 +40,30 @@ float3 fresnel(float3 f0, float l_dot_h)
 * “foreshortening factor” in the denominator, it's useful to combine them into a
 * single "visibility" term V.
 *
-* @param n_dot_h The cosine of the angle of between the surface normal N and the
-*                half-vector H.
+* @param n_dot_v
+* @param n_dot_l
 * @param alpha   Linear surface roughness. Rougher surfaces have fewer microfacets 
 *                aligned with the surface normal N.
 *
 * @return        The fraction of light reflected divided by the BRDF "foreshortening factor".
 */
-float visibility(float n_dot_h, float alpha)
+float visibility(float n_dot_v, float n_dot_l, float alpha)
 {
 #if BRDF_SPECULAR_V == BRDF_SPECULAR_V_IMPLICIT
+	// Implicit
 	// G_implicit = n_dot_l * n_dot_v
 	// V = G_implicit / (n_dot_l * n_dot_v) 
 	//   = 1
 
 	return 1.0f;
+#elif BRDF_SPECULAR_V == BRDF_SPECULAR_V_GGX
+	// Smith Correlated (GGX)
+
+	const float alpha2 = alpha * alpha;
+	const float lambda_v = sqrt(alpha2 + (1.0f - alpha2) * (n_dot_v * n_dot_v));
+	const float lambda_l = sqrt(alpha2 + (1.0f - alpha2) * (n_dot_l * n_dot_l));
+
+	return 2.0f / (n_dot_v * lambda_l + n_dot_l * lambda_v);
 #endif
 }
 
@@ -89,9 +106,9 @@ float3 specular(float3 specular_color, float n_dot_v, float n_dot_l, float n_dot
 	// f_s = (F * G * D) / (4 * n_dot_l * n_dot_v) 
 	//     = (F * D * V) / 4
 
-	float3 F = fresnel(specular_color, l_dot_h);
-	float V = visibility(n_dot_h, alpha);
-	float D = distribution(n_dot_h, alpha);
+	const float3 F = fresnel(specular_color, l_dot_h);
+	const float V = visibility(n_dot_v, n_dot_l, alpha);
+	const float D = distribution(n_dot_h, alpha);
 
 	return (F * D * V) / 4.0f;
 }
@@ -110,3 +127,8 @@ float3 diffuse(float3 diffuse_color)
 	// equation, not the BRDF.
 	return diffuse_color / PI;
 }
+
+// Reference
+// http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
+// https://google.github.io/filament/Materials.md.html
+// https://blog.selfshadow.com/publications/s2015-shading-course/hoffman/s2015_pbs_physics_math_slides.pdf
