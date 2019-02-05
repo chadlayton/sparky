@@ -1,3 +1,7 @@
+#include "per_frame_cbuffer.hlsli"
+#include "fullscreen_triangle.hlsli"
+#include "position_from_depth.hlsli"
+
 Texture2D gbuffer_base_color_texture : register(t0);
 Texture2D gbuffer_metalness_roughness_texture : register(t1);
 Texture2D gbuffer_normal_map_texture : register(t2);
@@ -9,29 +13,6 @@ static const float PI = 3.14159265f;
 static const float EPSILON = 1e-10;
 
 #include "brdf.hlsli"
-
-cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_material, etc
-{
-	float4x4 view_matrix;
-	float4x4 projection_matrix;
-	float4x4 view_projection_matrix;
-	float4x4 inverse_view_matrix;
-	float4x4 inverse_projection_matrix;
-	float4x4 inverse_view_projection_matrix;
-	float3 camera_position_ws;
-	float3 sun_direction_ws;
-};
-
-struct vs_input
-{
-	uint vertex_id : SV_VertexID;
-};
-
-struct vs_output
-{
-	float4 position_cs : SV_Position;
-	float2 texcoord : TEXCOORD;
-};
 
 float4x4 inverse(float4x4 input)
 {
@@ -61,50 +42,6 @@ float4x4 inverse(float4x4 input)
 		);
 #undef minor
 	return transpose(cofactors) / determinant(input);
-}
-
-// http://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau
-void fullscreen_triangle_cw(in uint vertex_id, out float4 position_cs, out float2 texcoord)
-{
-	position_cs.x = (float)(vertex_id / 2) * 4.0 - 1.0;
-	position_cs.y = (float)(vertex_id % 2) * 4.0 - 1.0;
-	position_cs.z = 0.0;
-	position_cs.w = 1.0;
-
-	// Generate the texture coordinates
-	texcoord.x = (float)(vertex_id / 2) * 2.0f;
-	texcoord.y = 1.0f - (float)(vertex_id % 2) * 2.0f;
-}
-
-void fullscreen_triangle_ccw(in uint vertex_id, out float4 position_cs, out float2 texcoord)
-{
-	position_cs.x = (float)((2 - vertex_id) / 2) * 4.0 - 1.0;
-	position_cs.y = (float)((2 - vertex_id) % 2) * 4.0 - 1.0;
-	position_cs.z = 0.0;
-	position_cs.w = 1.0;
-
-	// Generate the texture coordinates
-	texcoord.x = (float)((2 - vertex_id) / 2) * 2.0f;
-	texcoord.y = 1.0f - (float)((2 - vertex_id) % 2) * 2.0f;
-}
-
-// https://mynameismjp.wordpress.com/2010/09/05/position-from-depth-3/
-float3 position_ws_from_depth(in float depth_post_projection, in float2 texcoord)
-{
-	float linear_depth = projection_matrix._43 / (depth_post_projection - projection_matrix._33);
-	float4 position_cs = float4(texcoord * 2.0f - 1.0f, linear_depth, 1.0f);
-	position_cs.y *= -1.0f;
-	float4 position_ws = mul(position_cs, inverse_view_projection_matrix);
-	return position_ws.xyz / position_ws.w;
-}
-
-vs_output vs_main(vs_input input)
-{
-	vs_output output;
-
-	fullscreen_triangle_ccw(input.vertex_id, output.position_cs, output.texcoord);
-
-	return output;
 }
 
 struct point_light
@@ -144,12 +81,6 @@ float3 tonemap_uncharted2(float3 x)
 	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
 }
 
-struct ps_input
-{
-	float4 position_ss : SV_Position;
-	float2 texcoord : TEXCOORD;
-};
-
 float4 ps_main(ps_input input) : SV_Target0
 {
 	directional_light sun_light;
@@ -169,7 +100,7 @@ float4 ps_main(ps_input input) : SV_Target0
 	const float linear_roughness = max(0.1, metalness_roughness.g * metalness_roughness.g);
 	const float3 normal_ws = gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1;
 
-	const float3 position_ws = position_ws_from_depth(depth, input.texcoord);
+	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, projection_matrix, inverse_view_projection_matrix);
 	const float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws.xyz);
 
 	const float3 diffuse_color = base_color * (1.0f - metalness);

@@ -560,7 +560,6 @@ int main()
 
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
-	sp_compute_shader_handle low_freq_noise_shader_handle = sp_compute_shader_create({ "shaders/low_freq_noise.hlsl" });
 
 	// TODO: The pipeline state should be part of the material. Not sure how we'll make the association though.
 	sp_graphics_pipeline_state_handle gbuffer_single_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer_single_sided", {
@@ -599,14 +598,21 @@ int main()
 		sp_rasterizer_cull_face::none,
 	});
 
+	sp_compute_shader_handle low_freq_noise_shader_handle = sp_compute_shader_create({ "shaders/low_freq_noise.hlsl" });
+
 	sp_compute_pipeline_state_handle low_freq_noise_pipeline_state_handle = sp_compute_pipeline_state_create("low_freq_noise", { low_freq_noise_shader_handle });
 
-	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	//model scene = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	sp_vertex_shader_handle clouds_vertex_shader_handle = sp_vertex_shader_create({ "shaders/clouds.hlsl" });
+	sp_pixel_shader_handle clouds_pixel_shader_handle = sp_pixel_shader_create({ "shaders/clouds.hlsl" });
 
-	model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
+	sp_graphics_pipeline_state_handle clouds_pipeline_state_handle = sp_graphics_pipeline_state_create("clouds", {
+		clouds_vertex_shader_handle,
+		clouds_pixel_shader_handle,
+		{},
+		{
+			sp_texture_format::r8g8b8a8,
+		},
+	});
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "shaders/lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "shaders/lighting.hlsl" });
@@ -619,6 +625,13 @@ int main()
 			sp_texture_format::r8g8b8a8,
 		},
 	});
+
+	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	//model scene = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+
+	model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
 
 	__declspec(align(16)) struct
 	{
@@ -822,9 +835,31 @@ int main()
 				}
 			}
 
+			// clouds
+			{
+				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
+
+				sp_texture_handle clouds_render_target_handles[] = {
+					_sp._back_buffer_texture_handles[back_buffer_index]
+				};
+				sp_graphics_command_list_set_render_targets(graphics_command_list, clouds_render_target_handles, static_cast<int>(std::size(clouds_render_target_handles)), {});
+
+				// Copy SRV
+				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
+				//_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_base_color_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				//_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				//_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_normals_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				// Copy CBV
+				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
+			}
+
+			/*
 			// lighting
 			{
-
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
 
 				sp_texture_handle lighting_render_target_handles[] = {
@@ -843,14 +878,15 @@ int main()
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}
+			}*/
 
 			//sp_debug_gui_show_demo_window();
-			//bool open = true;
-			//int window_flags = 0;
-			//ImGui::Begin("Sparky", &open, window_flags);
-			//ImGui::InputFloat3("Sun Direction", sun_direction_ws.data, 1);
-			//ImGui::End();
+			bool open = true;
+			int window_flags = 0;
+			ImGui::Begin("Camera", &open, window_flags);
+			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
+			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
+			ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
 			// since the default imgui implementation expects to be the only one using it.

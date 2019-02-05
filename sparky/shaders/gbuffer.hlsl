@@ -1,3 +1,5 @@
+#include "per_frame_cbuffer.hlsli"
+
 #if BINDLESS_TEXTURES
 Texture2D textures_2d[12 /* Must match numDescriptors when creating root signature */] : register(t0, space0);
 #else
@@ -6,18 +8,6 @@ Texture2D metalness_roughness_texture : register(t1);
 #endif
 
 SamplerState default_sampler : register(s0);
-
-cbuffer per_frame_cbuffer : register(b0) // per_batch, per_instance, per_material, etc
-{
-	float4x4 view_matrix;
-	float4x4 projection_matrix;
-	float4x4 view_projection_matrix;
-	float4x4 inverse_view_matrix;
-	float4x4 inverse_projection_matrix;
-	float4x4 inverse_view_projection_matrix;
-	float3 camera_position_ws;
-	float3 sun_direction_ws;
-};
 
 cbuffer per_object_cbuffer : register(b1)
 {
