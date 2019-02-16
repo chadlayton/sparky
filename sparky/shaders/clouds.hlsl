@@ -4,7 +4,7 @@
 #include "noise.hlsli"
 
 Texture2D gbuffer_depth_texture : register(t0);
-Texture3D low_freq_noise_texture : register(t1);
+Texture3D cloud_shape_texture : register(t1);
 Texture3D high_freq_noise_texture : register(t2);
 
 SamplerState default_sampler : register(s0);
@@ -67,7 +67,9 @@ float sample_cloud_density(float3 position_ws, float3 direction_to_light_ws)
 {
 	const float height_cl = get_normalized_height_in_cloud_layer(position_ws);
 
-	return noise(position_ws) > 0.5 ? 1.0f : 0.0f * height_cl;
+	const float density = cloud_shape_texture.Sample(default_sampler, position_ws).r;
+
+	return noise(position_ws) > 0.5 ? 1.0f : 0.0f * height_cl * density;
 }
 
 float4 ps_main(ps_input input) : SV_Target0
@@ -82,11 +84,11 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	float t;
 
-	if (intersect_ray_sphere(planet_center_ws, PLANET_RADIUS + CLOUD_LAYER_HEIGHT_BEGIN, camera_position_ws, direction_from_camera_ws, t0))
+	if (intersect_ray_sphere(planet_center_ws, PLANET_RADIUS + CLOUD_LAYER_HEIGHT_BEGIN, camera_position_ws, direction_from_camera_ws, t))
 	{
 		const float3 direction_to_light_ws = normalize(-sun_direction_ws);
 
-		return sample_cloud_density(planet_center_ws + direction_from_camera_ws * t0, direction_to_light_ws);
+		return sample_cloud_density(planet_center_ws + direction_from_camera_ws * t, direction_to_light_ws);
 	}
 
 	return float4(0.0f, 1.0f, 0.0f, 1.0f);

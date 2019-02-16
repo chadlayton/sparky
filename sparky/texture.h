@@ -21,6 +21,7 @@ struct sp_texture_desc
 {
 	int width;
 	int height;
+	int depth;
 	sp_texture_format format;
 };
 
@@ -29,6 +30,7 @@ struct sp_texture
 	const char* _name;
 	int _width;
 	int _height;
+	int _depth;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
 
 	sp_descriptor_handle _render_target_view;

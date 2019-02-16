@@ -300,7 +300,7 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 			stbi_uc* image_data = stbi_load(image_path.c_str(), &image_width, &image_height, &image_channels, STBI_rgb_alpha);
 			assert(image_data);
 			
-			sp_texture_handle texture_handle = sp_texture_create(image_fx.uri.c_str(), { image_width, image_height, sp_texture_format::r8g8b8a8 });
+			sp_texture_handle texture_handle = sp_texture_create(image_fx.uri.c_str(), { image_width, image_height, 1, sp_texture_format::r8g8b8a8 });
 			sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
 			
 			stbi_image_free(image_data);
@@ -507,6 +507,38 @@ struct sp_render_pass_desc
 	sp_graphics_command_list_set_pipeline_state(handle);
 */
 
+void* sp_image_data_load_from_file(const char* filename)
+{
+	return nullptr;
+}
+
+void* sp_image_data_load_from_directory(const char* dirname)
+{
+	int width = 128;
+	int height = 128;
+	int depth = 128;
+
+	int image_slice_size_bytes = width * height * 4;
+	int image_size_bytes = image_slice_size_bytes * depth;
+
+	uint8_t* image_data = static_cast<uint8_t*>(malloc(image_size_bytes));
+
+	for (int i = 0; i < depth; ++i) 
+	{
+		const char* filename = dirname;
+
+		int width, height, channels;
+		stbi_uc* image_slice_data = stbi_load(filename, &width, &height, &channels, STBI_rgb_alpha);
+		assert(image_slice_data);
+
+		memcpy(image_data + (image_slice_size_bytes * i), image_slice_data, image_slice_size_bytes);
+
+		stbi_image_free(image_slice_data);
+	}
+
+	return image_data;
+}
+
 int main()
 {
 	const int window_width = 1280;
@@ -557,6 +589,10 @@ int main()
 
 	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
+
+	void* cloud_shape_image_data = sp_image_data_load_from_directory("textures/cloud_shape_000.tga");
+	sp_texture_handle cloud_shape_texture_handle = sp_texture_create("cloud_shape", { 128, 128, 128, sp_texture_format::r8g8b8a8 });
+	sp_texture_update(cloud_shape_texture_handle, cloud_shape_image_data, 128 * 128 * 128 * 4);
 
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
@@ -661,10 +697,10 @@ int main()
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("main", {});
 	sp_compute_command_list compute_command_list = sp_compute_command_list_create("main", {});
 
-	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, sp_texture_format::r8g8b8a8 });
-	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, sp_texture_format::r8g8b8a8 });
-	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, sp_texture_format::r8g8b8a8 });
-	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, sp_texture_format::d32 });
+	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
+	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
+	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
+	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d32 });
 
 	sp_render_pass_desc gbuffer_render_pass_desc = {
 		{
@@ -846,10 +882,8 @@ int main()
 
 				// Copy SRV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
-				//_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_base_color_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				//_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				//_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_normals_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc( &_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle )._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				// Copy CBV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
