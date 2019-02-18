@@ -507,36 +507,38 @@ struct sp_render_pass_desc
 	sp_graphics_command_list_set_pipeline_state(handle);
 */
 
-void* sp_image_data_load_from_file(const char* filename)
+void* sp_image_load_from_file(const char* filename)
 {
 	return nullptr;
 }
 
-void* sp_image_data_load_from_directory(const char* dirname)
+void* sp_image_volume_load_from_directory(const char* dirname, const char* format)
 {
-	int width = 128;
-	int height = 128;
-	int depth = 128;
+	int volume_width = 128;
+	int volume_height = 128;
+	int volume_depth = 128;
 
-	int image_slice_size_bytes = width * height * 4;
-	int image_size_bytes = image_slice_size_bytes * depth;
+	int image_slice_size_bytes = volume_width * volume_height * 4;
+	int image_volume_size_bytes = image_slice_size_bytes * volume_depth;
 
-	uint8_t* image_data = static_cast<uint8_t*>(malloc(image_size_bytes));
+	uint8_t* image_volume_data = static_cast<uint8_t*>(malloc(image_volume_size_bytes));
 
-	for (int i = 0; i < depth; ++i) 
+	for (int i = 0; i < volume_depth; ++i) 
 	{
-		const char* filename = dirname;
+		char filename[512];
+		int len = sprintf(filename, "%s/", dirname);
+		sprintf(filename + len, format, i);
 
-		int width, height, channels;
-		stbi_uc* image_slice_data = stbi_load(filename, &width, &height, &channels, STBI_rgb_alpha);
+		int image_slice_width, image_slice_height, image_slice_channels;
+		stbi_uc* image_slice_data = stbi_load(filename, &image_slice_width, &image_slice_height, &image_slice_channels, STBI_rgb_alpha);
 		assert(image_slice_data);
 
-		memcpy(image_data + (image_slice_size_bytes * i), image_slice_data, image_slice_size_bytes);
+		memcpy(image_volume_data + (image_slice_size_bytes * i), image_slice_data, image_slice_size_bytes);
 
 		stbi_image_free(image_slice_data);
 	}
 
-	return image_data;
+	return image_volume_data;
 }
 
 int main()
@@ -590,7 +592,7 @@ int main()
 	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
 
-	void* cloud_shape_image_data = sp_image_data_load_from_directory("textures/cloud_shape_000.tga");
+	void* cloud_shape_image_data = sp_image_volume_load_from_directory("textures/cloud_shape", "cloud_shape.%d.tga");
 	sp_texture_handle cloud_shape_texture_handle = sp_texture_create("cloud_shape", { 128, 128, 128, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(cloud_shape_texture_handle, cloud_shape_image_data, 128 * 128 * 128 * 4);
 
