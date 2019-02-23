@@ -84,6 +84,11 @@ math::mat<4> camera_get_transform(const camera& camera)
 
 void camera_update(camera* camera, const input& input)
 {
+	if (ImGui::GetIO().WantCaptureMouse)
+	{
+		return;
+	}
+
 	const math::mat<4> camera_transform = camera_get_transform(*camera);
 
 	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 100.0f : 1.0f;
@@ -693,8 +698,27 @@ int main()
 
 	} constant_buffer_per_object_data;
 
+	__declspec(align(16)) struct
+	{
+		float scale_bias;
+		float coverage_bias;
+		float type_bias;
+		float shape_base_bias;
+		float shape_detail_bias;
+		float debug0;
+		float debug1;
+		float debug2;
+		float debug3;
+		float debug4;
+		float debug5;
+		float debug6;
+
+	} constant_buffer_clouds_per_frame_data;
+	memset(&constant_buffer_clouds_per_frame_data, 0, sizeof(constant_buffer_clouds_per_frame_data));
+
 	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) });
 	sp_constant_buffer_handle constant_buffer_per_object_handle = sp_constant_buffer_create("per_object", { sizeof(constant_buffer_per_object_data) });
+	sp_constant_buffer_handle constant_buffer_clouds_per_frame_handle = sp_constant_buffer_create("clouds_per_frame", { sizeof(constant_buffer_clouds_per_frame_data) });
 
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("main", {});
 	sp_compute_command_list compute_command_list = sp_compute_command_list_create("main", {});
@@ -768,6 +792,10 @@ int main()
 			constant_buffer_per_frame_data.sun_direction_ws = sun_direction_ws;
 
 			sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
+		}
+
+		{
+			sp_constant_buffer_update(constant_buffer_clouds_per_frame_handle, &constant_buffer_clouds_per_frame_data, sizeof(constant_buffer_clouds_per_frame_data));
 		}
 
 		// Record all the commands we need to render the scene into the command list.
@@ -888,7 +916,8 @@ int main()
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				// Copy CBV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu )._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_clouds_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
 			}
@@ -922,6 +951,18 @@ int main()
 			ImGui::Begin("Camera", &open, window_flags);
 			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
 			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
+			ImGui::End();
+			ImGui::Begin("Clouds", &open, window_flags);
+			ImGui::DragFloat("Scale", &constant_buffer_clouds_per_frame_data.scale_bias, 0.01, -1, 1);
+			ImGui::DragFloat("Coverage", &constant_buffer_clouds_per_frame_data.coverage_bias, 0.01, -1, 1);
+			ImGui::DragFloat("Type", &constant_buffer_clouds_per_frame_data.type_bias, 0.01, -1, 1);
+			ImGui::DragFloat("Shape (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01, -1, 1);
+			ImGui::DragFloat("Shape (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01, -1, 1);
+
+			ImGui::DragFloat("Debug0", &constant_buffer_clouds_per_frame_data.debug0, 0.01, -1, 1);
+			ImGui::DragFloat("Debug1", &constant_buffer_clouds_per_frame_data.debug1, 0.01, -1, 1);
+			ImGui::DragFloat("Debug2", &constant_buffer_clouds_per_frame_data.debug2, 0.01, -1, 1);
+			ImGui::DragFloat("Debug3", &constant_buffer_clouds_per_frame_data.debug3, 0.01, -1, 1);
 			ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one

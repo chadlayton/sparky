@@ -8,7 +8,25 @@ Texture3D cloud_shape_texture : register(t1);
 Texture3D high_freq_noise_texture : register(t2);
 
 SamplerState default_sampler : register(s0);
-SamplerState clouds_sampler : register(s1);
+
+cbuffer clouds_per_frame_cbuffer : register(b1)
+{
+	float scale_bias;
+	float coverage_bias;
+	float type_bias;
+	float shape_base_bias;
+	float shape_detail_bias;
+	float debug0;
+	float debug1;
+	float debug2;
+	float debug3;
+	float debug4;
+	float debug5;
+	float debug6;
+};
+
+#define PI      3.1415926f
+#define EPSILON 0.000001f
 
 #define PLANET_RADIUS            4000.0f
 #define CLOUD_LAYER_HEIGHT_BEGIN 1500.0f
@@ -16,7 +34,12 @@ SamplerState clouds_sampler : register(s1);
 
 float remap(float original_value, float original_min, float original_max, float new_min, float new_max)
 {
-	return new_min + (((clamp(original_value, original_min, original_max) - original_min) / (original_max - original_min)) * (new_max - new_min));
+	return new_min + (((original_value - original_min) / (original_max - original_min)) * (new_max - new_min));
+}
+
+float remap_and_clamp(float original_value, float original_min, float original_max, float new_min, float new_max)
+{
+	return clamp(new_min + (((original_value - original_min) / (original_max - original_min)) * (new_max - new_min)), new_min, new_max);
 }
 
 bool intersect_ray_sphere(float3 sphere_center, float sphere_radius, float3 ray_origin, float3 ray_dir, inout float t)
@@ -58,21 +81,27 @@ bool intersect_ray_sphere(float3 sphere_center, float sphere_radius, float3 ray_
 	return true;
 }
 
-float get_cloud_type_factor(float height_cl, float cloud_type) 
+float apply_cloud_type(float density, float height_cl, float cloud_type) 
 {
-	float cumulus = remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.7, 0.9, 1.0, 0.0);
-	float stratocumulus = remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.2, 0.7, 1.0, 0.0);
-	float stratus = remap(height_cl, 0.0, 0.1, 0.0, 1.0) * remap(height_cl, 0.2, 0.3, 1.0, 0.0);
+	const float cumulus = remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.7, 0.9, 1.0, 0.0);
+	const float stratocumulus = remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.2, 0.7, 1.0, 0.0);
+	const float stratus = remap(height_cl, 0.0, 0.1, 0.0, 1.0) * remap(height_cl, 0.2, 0.3, 1.0, 0.0);
 
-	float d1 = lerp(stratus, stratocumulus, saturate(cloud_type * 2.0));
-	float d2 = lerp(stratocumulus, cumulus, saturate((cloud_type - 0.5) * 2.0));
-	return lerp(d1, d2, cloud_type);
+	const float stratus_to_stratocumulus = lerp(stratus, stratocumulus, saturate(cloud_type * 2.0));
+	const float stratocumulus_to_cumulus = lerp(stratocumulus, cumulus, saturate((cloud_type - 0.5) * 2.0));
+
+	return density * lerp(stratus_to_stratocumulus, stratocumulus_to_cumulus, cloud_type);
 }
 
-float get_cloud_coverage_factor(float height_cl, float cloud_coverage)
+float apply_cloud_coverage(float density, float height_cl, float cloud_coverage)
 {
-	float anvil_bias = 0.5f;
-	return pow(cloud_coverage, remap(height_cl, 0.7, 0.8, 1.0, lerp(1.0, 0.5, anvil_bias)));
+	// cloud_coverage = pow(cloud_coverage, remap_and_clamp(height_cl, 0.7, 0.8, 1.0, 0.5));
+
+	density = remap_and_clamp(density, min(1 - cloud_coverage, 1.0 - EPSILON), 1.0, 0.0, 1.0);
+
+	density *= cloud_coverage;
+
+	return density;
 }
 
 float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sample_position_ws)
@@ -84,39 +113,44 @@ float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sampl
 
 float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws, float3 direction_to_light_ws)
 {
-	const float cloud_shape_sample_scale = 0.0002f;
+	const float cloud_shape_sample_scale = 0.0002f * (1 + scale_bias);
 
 	const float3 sample_position_uv = sample_position_ws * cloud_shape_sample_scale;
 
-#define DEBUG_CLOUD_DENSITY
+//#define DEBUG_CLOUD_DENSITY
 #ifdef DEBUG_CLOUD_DENSITY
-	float density = 0.0f;
-
-	if (distance(sample_position_uv.xz, float2(0.0f, 0.0f)) < 0.1)
-	{
-		density = 0.05;
-	}
+	float density = (distance(sample_position_uv.xz, float2(0.0f, 0.0f)) < 0.1) ? 0.05 : 0.0;
 #else
 	const float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_uv);
 
-	float density = cloud_shape.r;
+	const float detail_fbm = 0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a;
 
-	const float erosion = 0.625 * cloud_shape.y + 0.25 * cloud_shape.z + 0.125 * cloud_shape.w;
-
-	density = saturate(remap(density, erosion, 1.0, 0.0, 1.0));
+	float density = remap_and_clamp(cloud_shape.r * (1 + shape_base_bias), -(1 - detail_fbm * (1 + shape_detail_bias)), 1.0, 0.0, 1.0);
 #endif
 
 	const float height_cl = get_normalized_height_in_cloud_layer(planet_center_ws, sample_position_ws);
 
-	float cloud_type = 0.0f;
+	float cloud_type_base = 0.5;
+	if (debug0 > 0.1)
+	{
+		cloud_type_base = noise(sample_position_uv) * (1 + debug1);
+	}
+	float cloud_type = saturate(cloud_type_base + type_bias);
 
-	const float cloud_type_factor = get_cloud_type_factor(height_cl, cloud_type);
+	density = apply_cloud_type(density, height_cl, cloud_type);
 
-	float cloud_coverage = 0.5f;
+	float coverage_base = 0.5;
+	if (debug2 > 0.1)
+	{
+		coverage_base = noise(sample_position_uv) * (1 + debug3);
+	}
+	float cloud_coverage = saturate(coverage_base + coverage_bias);
 
-	const float cloud_coverage_factor = get_cloud_coverage_factor(height_cl, cloud_coverage);
+	density = apply_cloud_coverage(density, height_cl, cloud_coverage);
 
-	return density * cloud_type_factor * cloud_coverage_factor;
+	return saturate(density);
+
+	//return density > 0.5 ? 1 : 0;
 }
 
 float4 ps_main(ps_input input) : SV_Target0
@@ -144,7 +178,7 @@ float4 ps_main(ps_input input) : SV_Target0
 
 		const float3 direction_to_light_ws = normalize(-sun_direction_ws);
 
-		int step_count = 64;
+		int step_count = 128;
 
 		float step_size_ws = (distance_from_camera_to_cloud_layer_height_end_ws - distance_from_camera_to_cloud_layer_height_begin_ws) / step_count;
 
@@ -159,9 +193,12 @@ float4 ps_main(ps_input input) : SV_Target0
 			density += sample_cloud_density(planet_center_ws, sample_position_ws, direction_to_light_ws);
 		}
 
-		float3 sky_blue = float3(0.53, 0.80, 0.92);
+		// density = remap(density, 0.1, 1.0, 0, 1.0);
 
-		return float4(sky_blue + density, 1.0f);
+		float4 cloud_white = float4(1.0, 1.0, 1.0, 1.0);
+		float4 sky_blue = float4(0.53, 0.80, 0.92, 1.0);
+
+		return lerp(sky_blue, cloud_white, saturate(density));
 	}
 
 	return float4(0.0f, 1.0f, 0.0f, 1.0f);
