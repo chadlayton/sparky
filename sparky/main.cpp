@@ -517,11 +517,11 @@ void* sp_image_load_from_file(const char* filename)
 	return nullptr;
 }
 
-void* sp_image_volume_load_from_directory(const char* dirname, const char* format)
+void* sp_image_volume_load_from_directory(const char* dirname, const char* format, int size)
 {
-	int volume_width = 128;
-	int volume_height = 128;
-	int volume_depth = 128;
+	const int volume_width = size;
+	const int volume_height = size;
+	const int volume_depth = size;
 
 	int image_slice_size_bytes = volume_width * volume_height * 4;
 	int image_volume_size_bytes = image_slice_size_bytes * volume_depth;
@@ -597,9 +597,13 @@ int main()
 	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
 
-	void* cloud_shape_image_data = sp_image_volume_load_from_directory("textures/cloud_shape", "cloud_shape.%d.tga");
+	const void* cloud_shape_image_data = sp_image_volume_load_from_directory("textures/cloud_shape", "cloud_shape.%d.tga", 128);
 	sp_texture_handle cloud_shape_texture_handle = sp_texture_create("cloud_shape", { 128, 128, 128, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(cloud_shape_texture_handle, cloud_shape_image_data, 128 * 128 * 128 * 4);
+
+	const void* cloud_detail_image_data = sp_image_volume_load_from_directory("textures/cloud_detail", "cloud_detail.%d.tga", 32);
+	sp_texture_handle cloud_detail_texture_handle = sp_texture_create("cloud_detail", { 32, 32, 32, sp_texture_format::r8g8b8a8 });
+	sp_texture_update(cloud_detail_texture_handle, cloud_detail_image_data, 32 * 32 * 32 * 4);
 
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
@@ -700,7 +704,9 @@ int main()
 
 	__declspec(align(16)) struct
 	{
-		float scale_bias;
+		float shape_sample_scale_bias;
+		float detail_sample_scale_bias;
+		float density_bias;
 		float coverage_bias;
 		float type_bias;
 		float shape_base_bias;
@@ -710,8 +716,6 @@ int main()
 		float debug2;
 		float debug3;
 		float debug4;
-		float debug5;
-		float debug6;
 
 	} constant_buffer_clouds_per_frame_data;
 	memset(&constant_buffer_clouds_per_frame_data, 0, sizeof(constant_buffer_clouds_per_frame_data));
@@ -914,6 +918,7 @@ int main()
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_detail_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				// Copy CBV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -951,18 +956,21 @@ int main()
 			ImGui::Begin("Camera", &open, window_flags);
 			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
 			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
+			ImGui::Text("Forward:  %.1f, %.1f, %.1f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
 			ImGui::End();
 			ImGui::Begin("Clouds", &open, window_flags);
-			ImGui::DragFloat("Scale", &constant_buffer_clouds_per_frame_data.scale_bias, 0.01, -1, 1);
-			ImGui::DragFloat("Coverage", &constant_buffer_clouds_per_frame_data.coverage_bias, 0.01, -1, 1);
-			ImGui::DragFloat("Type", &constant_buffer_clouds_per_frame_data.type_bias, 0.01, -1, 1);
-			ImGui::DragFloat("Shape (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01, -1, 1);
-			ImGui::DragFloat("Shape (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01, -1, 1);
+			ImGui::DragFloat("Scale (Base)", &constant_buffer_clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Scale (Detail)", &constant_buffer_clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Density", &constant_buffer_clouds_per_frame_data.density_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Coverage", &constant_buffer_clouds_per_frame_data.coverage_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Type", &constant_buffer_clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Shape (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Shape (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
 
-			ImGui::DragFloat("Debug0", &constant_buffer_clouds_per_frame_data.debug0, 0.01, -1, 1);
-			ImGui::DragFloat("Debug1", &constant_buffer_clouds_per_frame_data.debug1, 0.01, -1, 1);
-			ImGui::DragFloat("Debug2", &constant_buffer_clouds_per_frame_data.debug2, 0.01, -1, 1);
-			ImGui::DragFloat("Debug3", &constant_buffer_clouds_per_frame_data.debug3, 0.01, -1, 1);
+			ImGui::DragFloat("Debug0", &constant_buffer_clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug1", &constant_buffer_clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug2", &constant_buffer_clouds_per_frame_data.debug2, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug3", &constant_buffer_clouds_per_frame_data.debug3, 0.01f, -1.0f, 1.0f);
 			ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
