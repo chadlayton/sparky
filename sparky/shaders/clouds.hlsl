@@ -6,6 +6,7 @@
 Texture2D gbuffer_depth_texture : register(t0);
 Texture3D cloud_shape_texture : register(t1);
 Texture3D cloud_detail_texture : register(t2);
+Texture2D weather : register(t3);
 
 SamplerState default_sampler : register(s0);
 
@@ -18,6 +19,8 @@ cbuffer clouds_per_frame_cbuffer : register(b1)
 	float type_bias;
 	float shape_base_bias;
 	float shape_detail_bias;
+	float extinction_coeff; // sigma_t (m^-1)
+	float scattering_coeff; // sigma_s (m^-1)
 	float debug0;
 	float debug1;
 	float debug2;
@@ -34,8 +37,9 @@ cbuffer clouds_per_frame_cbuffer : register(b1)
 #define CLOUD_LAYER_HEIGHT_BEGIN 1500.0f
 #define CLOUD_LAYER_HEIGHT_END   4000.0f
 
-//#define DEBUG_CLOUD_SHAPE_SPHERE
-#define DEBUG_CLOUD_SHAPE_CYLINDER
+//#define DEBUG_CLOUD_WEATHER_SPHERE
+//#define DEBUG_CLOUD_WEATHER_CYLINDER
+//#define DEBUG_CLOUD_WEATHER_GRID
 
 #define DEBUG_PLANET_FLAT
 
@@ -141,25 +145,36 @@ float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sampl
 
 float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 {
-#if defined(DEBUG_CLOUD_SHAPE_CYLINDER)
-	float density = (distance(sample_position_ws.xz, float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
-#elif defined(DEBUG_CLOUD_SHAPE_SPHERE)
-	float density = (distance(sample_position_ws, float3(0.0, (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
+#if defined(DEBUG_CLOUD_WEATHER_CYLINDER)
+	float weather = (distance(sample_position_ws.xz, float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
+#elif defined(DEBUG_CLOUD_WEATHER_SPHERE)
+	float weather = (distance(sample_position_ws, float3(0.0, (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
+#elif defined(DEBUG_CLOUD_WEATHER_GRID)
+	float weather = abs((int)(sample_position_ws.x * 0.001) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001) % 4) == 0 ? 1.0 : 0.0;
 #else
+	float weather = cloud_shape_texture.Sample(default_sampler, float3(sample_position_ws.xz, 0.0) * 0.0002 * (1 - debug0)) > (0.5 + debug1) ? 1.0 : 0.0;
+#endif
+
+	return weather;
+
 	const float cloud_shape_sample_scale_base = 0.0002f;
 	const float cloud_detail_sample_scale_base = 0.0002f;
+
+	sample_position_ws.y = 0;
 
 	float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias))) + shape_base_bias;
 	float4 cloud_detail = cloud_detail_texture.Sample(default_sampler, sample_position_ws * (cloud_detail_sample_scale_base * (1 - detail_sample_scale_bias))) + shape_detail_bias;
 
-	float density = remap(cloud_shape.r, cloud_detail.r, 1.0, 0.0, 1.0f) + density_bias;
+	float density = cloud_shape.r;
+	//float density = remap(cloud_shape.r, density_bias, 1.0, 0.0, 1.0f);
 	
 	density = clamp(density, 0.0, 1.0f);
 
 	// const float detail_fbm = 0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a;
 
 	// float density = remap(cloud_shape.r * (1 + shape_base_bias), -(1 - detail_fbm * (1 + shape_detail_bias)), 1.0, 0.0, 1.0);
-#endif
+
+	density *= weather;
 
 	return density;
 
@@ -176,8 +191,6 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 	density = apply_cloud_coverage(density, height_cl, cloud_coverage);
 
 	return saturate(density);
-
-	//return density > 0.5 ? 1 : 0;
 }
 
 float4 ps_main(ps_input input) : SV_Target0
@@ -194,19 +207,19 @@ float4 ps_main(ps_input input) : SV_Target0
 #if defined(DEBUG_PLANET_FLAT)
 	// Look for ground
 	float distance_from_camera_to_planet_surface_ws;
-	if (intersect_ray_plane(float3(0.0f, -1.0f, 0.0f), float3(0.0f, 0.0, 0.0f), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
+	if (intersect_ray_plane(float3(0.0f, -1.0f, 0.0f), float3(planet_center_ws.x, 0.0, position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
 	{
 		return float4(0.0f, 0.8f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_begin_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0f, CLOUD_LAYER_HEIGHT_BEGIN, 0.0f), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(planet_center_ws.x, CLOUD_LAYER_HEIGHT_BEGIN, position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_end_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0f, CLOUD_LAYER_HEIGHT_END, 0.0f), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(planet_center_ws.x, CLOUD_LAYER_HEIGHT_END, position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	};
@@ -261,10 +274,7 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	float step_size_ws = (distance_from_camera_to_cloud_layer_height_end_ws - distance_from_camera_to_cloud_layer_height_begin_ws) / step_count;
 
-	float extinction_coeff = 0.03f; // sigma_t (m^-1)
-	float scattering_coeff = 0.01f; // sigma_s (m^-1)
-
-	float3 scattering = float3(0.53, 0.80, 0.92);
+	float3 scattering = float3(0.0, 0.0, 0.0);
 	float extinction = 1.0f;
 
 	for (int i = 0; i < step_count; ++i)
@@ -275,17 +285,13 @@ float4 ps_main(ps_input input) : SV_Target0
 
 		float density = sample_cloud_density(planet_center_ws, sample_position_ws);
 
-		extinction *= exp(-density * step_size_ws * extinction_coeff);
+		extinction *= exp(-density * inverse_step_count * (1.0 - extinction_coeff));
 
-		float luminance = 1.0;
-
-		scattering += extinction * luminance * scattering_coeff * step_size_ws;
+		scattering += extinction * density * (1.0 - scattering_coeff) * inverse_step_count;
 	}
 
-	//extinction = 1.0f;
-
 	float3 sky = float3(0.53, 0.80, 0.92);
-	return float4(scattering, extinction);
+	return float4(sky * extinction + scattering, 1.0);
 }
 
 // https://www.guerrilla-games.com/read/the-real-time-volumetric-cloudscapes-of-horizon-zero-dawn

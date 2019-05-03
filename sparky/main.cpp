@@ -711,11 +711,15 @@ int main()
 		float type_bias;
 		float shape_base_bias;
 		float shape_detail_bias;
+		float extinction_coeff;
+		float scattering_coeff;
 		float debug0;
 		float debug1;
 		float debug2;
 		float debug3;
 		float debug4;
+		float debug5;
+		float debug6;
 
 	} constant_buffer_clouds_per_frame_data;
 	memset(&constant_buffer_clouds_per_frame_data, 0, sizeof(constant_buffer_clouds_per_frame_data));
@@ -956,7 +960,8 @@ int main()
 			ImGui::Begin("Camera", &open, window_flags);
 			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
 			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
-			ImGui::Text("Forward:  %.1f, %.1f, %.1f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
+			// TODO: Something is not right here e.g. <0,-1,0> is up
+			ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
 			ImGui::End();
 			ImGui::Begin("Clouds", &open, window_flags);
 			ImGui::DragFloat("Scale (Base)", &constant_buffer_clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
@@ -966,6 +971,8 @@ int main()
 			ImGui::DragFloat("Type", &constant_buffer_clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Shape (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Shape (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Extinction", &constant_buffer_clouds_per_frame_data.extinction_coeff, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Scattering", &constant_buffer_clouds_per_frame_data.scattering_coeff, 0.01f, 0.0f, 1.0f);
 
 			ImGui::DragFloat("Debug0", &constant_buffer_clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug1", &constant_buffer_clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);

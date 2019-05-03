@@ -1,20 +1,27 @@
-// https://stackoverflow.com/a/17479300
-uint hash(uint x) 
+float rand(in float2 st)
 {
-    x += (x << 10u);
-    x ^= (x >>  6u);
-    x += (x <<  3u);
-    x ^= (x >> 11u);
-    x += (x << 15u);
-
-    return x;
+	return frac(sin(dot(st.xy, float2(12.9898, 78.233))) * 43758.5453123);
 }
 
-uint hash(uint2 v) { return hash(v.x ^ hash(v.y)                        ); }
-uint hash(uint3 v) { return hash(v.x ^ hash(v.y) ^ hash(v.z)            ); }
-uint hash(uint4 v) { return hash(v.x ^ hash(v.y) ^ hash(v.z) ^ hash(v.w)); }
+// 2D Noise based on Morgan McGuire @morgan3d
+// https://www.shadertoy.com/view/4dS3Wd
+float noise(in float2 st)
+{
+	float2 i = floor(st);
+	float2 f = frac(st);
 
-float noise(float  x) { return asfloat(hash(asuint(x))); }
-float noise(float2 v) { return asfloat(hash(asuint(v))); }
-float noise(float3 v) { return asfloat(hash(asuint(v))); }
-float noise(float4 v) { return asfloat(hash(asuint(v))); }
+	// Four corners in 2D of a tile
+	float a = rand(i);
+	float b = rand(i + float2(1.0, 0.0));
+	float c = rand(i + float2(0.0, 1.0));
+	float d = rand(i + float2(1.0, 1.0));
+
+	// Smooth Interpolation
+
+	// Cubic Hermine Curve.  Same as SmoothStep()
+	float2 u = f * f * (3.0 - 2.0 * f);
+	// u = smoothstep(0.,1.,f);
+
+	// Mix 4 coorners percentages
+	return lerp(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
