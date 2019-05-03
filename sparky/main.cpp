@@ -91,7 +91,7 @@ void camera_update(camera* camera, const input& input)
 
 	const math::mat<4> camera_transform = camera_get_transform(*camera);
 
-	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 100.0f : 1.0f;
+	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 1000.0f : 1.0f;
 
 	if (input.current.keys['A'])
 	{
@@ -790,6 +790,8 @@ int main()
 			const math::mat<4> projection_matrix = math::create_perspective_fov_rh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
 
+			const math::mat<4> test = view_matrix * math::inverse(view_matrix);
+
 			constant_buffer_per_frame_data.view_matrix = view_matrix;
 			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
 			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
@@ -843,7 +845,7 @@ int main()
 				for (int i = 0; i < scene.meshes.size(); ++i)
 				{
 					{
-						const math::mat<4> world_matrix = math::create_identity<4>();
+						const math::mat<4> world_matrix = math::create_scale(math::vec<3>(600.0, 600.0f, 600.0f));
 
 						constant_buffer_per_object_data.world_matrix = world_matrix;
 
@@ -876,13 +878,13 @@ int main()
 
 				for (int i = 0; i < cube.meshes.size(); ++i)
 				{
-					{
-						const math::mat<4> world_matrix = math::create_identity<4>();
+					//{
+					//	const math::mat<4> world_matrix = math::create_identity<4>();
 
-						constant_buffer_per_object_data.world_matrix = world_matrix;
+					//	constant_buffer_per_object_data.world_matrix = world_matrix;
 
-						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
-					}
+					//	sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
+					//}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
 					if (cube.materials[i].double_sided)

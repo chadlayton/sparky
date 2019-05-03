@@ -39,7 +39,7 @@ cbuffer clouds_per_frame_cbuffer : register(b1)
 
 //#define DEBUG_CLOUD_WEATHER_SPHERE
 //#define DEBUG_CLOUD_WEATHER_CYLINDER
-//#define DEBUG_CLOUD_WEATHER_GRID
+#define DEBUG_CLOUD_WEATHER_GRID
 
 #define DEBUG_PLANET_FLAT
 
@@ -152,7 +152,7 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 #elif defined(DEBUG_CLOUD_WEATHER_GRID)
 	float weather = abs((int)(sample_position_ws.x * 0.001) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001) % 4) == 0 ? 1.0 : 0.0;
 #else
-	float weather = cloud_shape_texture.Sample(default_sampler, float3(sample_position_ws.xz, 0.0) * 0.0002 * (1 - debug0)) > (0.5 + debug1) ? 1.0 : 0.0;
+	float weather = cloud_shape_texture.Sample(default_sampler, float3(sample_position_ws.xz, 0.0) * 0.0002 * (1 - debug0)).r > (0.5 + debug1) ? 1.0 : 0.0;
 #endif
 
 	return weather;
@@ -195,7 +195,34 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 
 float4 ps_main(ps_input input) : SV_Target0
 {
-	const float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
+	if (input.texcoord.x < 0.1 && input.texcoord.y < 0.1)
+	{
+		/*
+		const float3 position_ws1 = position_ws_from_depth(0.1, float2(0.0, 0.0), projection_matrix, inverse_view_projection_matrix);
+		const float3 position_ws2 = position_ws_from_depth(0.1, float2(0.1, 0.0), projection_matrix, inverse_view_projection_matrix);
+
+
+		float3 d = abs(position_ws2.x - position_ws1.x);
+
+		if (d.y > 0 || d.z > 0)
+		{
+			return float4(1.0, 1.0, 0.0, 1.0);
+		}
+
+		if (d.x > 0.02 || d.x < 0.018)
+		{
+			return float4(1.0, 0.0, 0.0, 1.0);
+		}
+
+		return float4(abs(position_ws2 - position_ws1) * 10, 1.0);
+		*/
+
+		const float3 position_ws = position_ws_from_depth(0.1, float2(0.0, 0.0), projection_matrix, inverse_view_projection_matrix);
+		
+		return float4(abs(position_ws - camera_position_ws) * 4, 1.0);
+	}
+
+	const float depth = 1.0f;// gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
 
 	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, projection_matrix, inverse_view_projection_matrix);
 
@@ -207,19 +234,19 @@ float4 ps_main(ps_input input) : SV_Target0
 #if defined(DEBUG_PLANET_FLAT)
 	// Look for ground
 	float distance_from_camera_to_planet_surface_ws;
-	if (intersect_ray_plane(float3(0.0f, -1.0f, 0.0f), float3(planet_center_ws.x, 0.0, position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
+	if (intersect_ray_plane(float3(0.0f, -1.0f, 0.0f), float3(camera_position_ws.x, 0.0, camera_position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
 	{
 		return float4(0.0f, 0.8f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_begin_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(planet_center_ws.x, CLOUD_LAYER_HEIGHT_BEGIN, position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(camera_position_ws.x, CLOUD_LAYER_HEIGHT_BEGIN, camera_position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_end_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(planet_center_ws.x, CLOUD_LAYER_HEIGHT_END, position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(camera_position_ws.x, CLOUD_LAYER_HEIGHT_END, camera_position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	};
