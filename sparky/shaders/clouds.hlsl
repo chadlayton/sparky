@@ -6,7 +6,7 @@
 Texture2D gbuffer_depth_texture : register(t0);
 Texture3D cloud_shape_texture : register(t1);
 Texture3D cloud_detail_texture : register(t2);
-Texture2D weather : register(t3);
+Texture2D weather_texture : register(t3);
 
 SamplerState default_sampler : register(s0);
 
@@ -35,11 +35,11 @@ cbuffer clouds_per_frame_cbuffer : register(b1)
 
 #define PLANET_RADIUS            4000.0f
 #define CLOUD_LAYER_HEIGHT_BEGIN 1500.0f
-#define CLOUD_LAYER_HEIGHT_END   4000.0f
+#define CLOUD_LAYER_HEIGHT_END   2000.0f //4000.0f
 
 //#define DEBUG_CLOUD_WEATHER_SPHERE
 //#define DEBUG_CLOUD_WEATHER_CYLINDER
-#define DEBUG_CLOUD_WEATHER_GRID
+//#define DEBUG_CLOUD_WEATHER_GRID
 
 #define DEBUG_PLANET_FLAT
 
@@ -106,17 +106,12 @@ bool intersect_ray_plane(float3 plane_normal, float3 point_on_plane, float3 ray_
 	return true;
 }
 
-bool intersect_cloud_layer(float3 ray_origin, float3 ray_dir)
-{
-
-}
-
 // cloud type controls the the height of the cloud which in turn defines how billowy vs how wispy it is
 float apply_cloud_type(float density, float height_cl, float cloud_type) 
 {
-	const float cumulus = remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.7, 0.9, 1.0, 0.0);
-	const float stratocumulus = remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.2, 0.7, 1.0, 0.0);
-	const float stratus = remap(height_cl, 0.0, 0.1, 0.0, 1.0) * remap(height_cl, 0.2, 0.3, 1.0, 0.0);
+	const float cumulus = saturate(remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.7, 0.9, 1.0, 0.0));
+	const float stratocumulus = saturate(remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.2, 0.7, 1.0, 0.0));
+	const float stratus = saturate(remap(height_cl, 0.0, 0.1, 0.0, 1.0) * remap(height_cl, 0.2, 0.3, 1.0, 0.0));
 
 	const float stratus_to_stratocumulus = lerp(stratus, stratocumulus, saturate(cloud_type * 2.0));
 	const float stratocumulus_to_cumulus = lerp(stratocumulus, cumulus, saturate((cloud_type - 0.5) * 2.0));
@@ -125,10 +120,8 @@ float apply_cloud_type(float density, float height_cl, float cloud_type)
 }
 
 // cloud coverage decides the presence of a cloud
-float apply_cloud_coverage(float density, float height_cl, float cloud_coverage)
+float apply_cloud_coverage(float density, float cloud_coverage)
 {
-	// cloud_coverage = pow(cloud_coverage, remap_and_clamp(height_cl, 0.7, 0.8, 1.0, 0.5));
-
 	density = remap(density, min(1 - cloud_coverage, 1.0 - EPSILON), 1.0, 0.0, 1.0);
 
 	density *= cloud_coverage;
@@ -138,45 +131,39 @@ float apply_cloud_coverage(float density, float height_cl, float cloud_coverage)
 
 float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sample_position_ws)
 {
+#if defined(DEBUG_PLANET_FLAT)
+	const float sample_height = sample_position_ws.y;
+#else
 	const float sample_height = distance(planet_center_ws, sample_position_ws) - PLANET_RADIUS;
-
+#endif
 	return saturate((sample_height - CLOUD_LAYER_HEIGHT_BEGIN) / (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN));
 }
 
 float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 {
 #if defined(DEBUG_CLOUD_WEATHER_CYLINDER)
-	float weather = (distance(sample_position_ws.xz, float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
+	float coverage_base = (distance(sample_position_ws.xz, float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
 #elif defined(DEBUG_CLOUD_WEATHER_SPHERE)
-	float weather = (distance(sample_position_ws, float3(0.0, (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
+	float coverage_base = (distance(sample_position_ws, float3(0.0, (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
 #elif defined(DEBUG_CLOUD_WEATHER_GRID)
-	float weather = abs((int)(sample_position_ws.x * 0.001) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001) % 4) == 0 ? 1.0 : 0.0;
+	float coverage_base = abs((int)(sample_position_ws.x * 0.001) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001) % 4) == 0 ? 1.0 : 0.0;
 #else
-	float weather = cloud_shape_texture.Sample(default_sampler, float3(sample_position_ws.xz, 0.0) * 0.0002 * (1 - debug0)).r > (0.5 + debug1) ? 1.0 : 0.0;
+	float coverage_base = weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.0002 * (1 - debug0)).r;
 #endif
-
-	return weather;
 
 	const float cloud_shape_sample_scale_base = 0.0002f;
 	const float cloud_detail_sample_scale_base = 0.0002f;
 
-	sample_position_ws.y = 0;
+	float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias)));
+	// float4 cloud_detail = cloud_detail_texture.Sample(default_sampler, sample_position_ws * (cloud_detail_sample_scale_base * (1 - detail_sample_scale_bias)));
 
-	float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias))) + shape_base_bias;
-	float4 cloud_detail = cloud_detail_texture.Sample(default_sampler, sample_position_ws * (cloud_detail_sample_scale_base * (1 - detail_sample_scale_bias))) + shape_detail_bias;
-
-	float density = cloud_shape.r;
-	//float density = remap(cloud_shape.r, density_bias, 1.0, 0.0, 1.0f);
+	float density = remap(saturate(cloud_shape.r + shape_base_bias), saturate((0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a) + shape_detail_bias), 1.0, 0.0, 1.0f);
 	
 	density = clamp(density, 0.0, 1.0f);
 
-	// const float detail_fbm = 0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a;
+	float coverage = saturate(coverage_base + coverage_bias);
 
-	// float density = remap(cloud_shape.r * (1 + shape_base_bias), -(1 - detail_fbm * (1 + shape_detail_bias)), 1.0, 0.0, 1.0);
-
-	density *= weather;
-
-	return density;
+	density = apply_cloud_coverage(density, coverage);
 
 	const float height_cl = get_normalized_height_in_cloud_layer(planet_center_ws, sample_position_ws);
 
@@ -185,72 +172,42 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 
 	density = apply_cloud_type(density, height_cl, cloud_type);
 
-	float coverage_base = 0.5;
-	float cloud_coverage = saturate(coverage_base + coverage_bias);
-
-	density = apply_cloud_coverage(density, height_cl, cloud_coverage);
-
 	return saturate(density);
 }
 
 float4 ps_main(ps_input input) : SV_Target0
 {
-	if (input.texcoord.x < 0.1 && input.texcoord.y < 0.1)
-	{
-		/*
-		const float3 position_ws1 = position_ws_from_depth(0.1, float2(0.0, 0.0), projection_matrix, inverse_view_projection_matrix);
-		const float3 position_ws2 = position_ws_from_depth(0.1, float2(0.1, 0.0), projection_matrix, inverse_view_projection_matrix);
-
-
-		float3 d = abs(position_ws2.x - position_ws1.x);
-
-		if (d.y > 0 || d.z > 0)
-		{
-			return float4(1.0, 1.0, 0.0, 1.0);
-		}
-
-		if (d.x > 0.02 || d.x < 0.018)
-		{
-			return float4(1.0, 0.0, 0.0, 1.0);
-		}
-
-		return float4(abs(position_ws2 - position_ws1) * 10, 1.0);
-		*/
-
-		const float3 position_ws = position_ws_from_depth(0.1, float2(0.0, 0.0), projection_matrix, inverse_view_projection_matrix);
-		
-		return float4(abs(position_ws - camera_position_ws) * 4, 1.0);
-	}
-
-	const float depth = 1.0f;// gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
+	const float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
 
 	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, projection_matrix, inverse_view_projection_matrix);
 
 	const float3 direction_from_camera_ws = normalize(position_ws - camera_position_ws);
 
-	// Position planet such that surface is at origin
-	const float3 planet_center_ws = float3(0.0f, -PLANET_RADIUS, 0.0f);
-
 #if defined(DEBUG_PLANET_FLAT)
+	const float3 planet_center_ws = float3(position_ws.x, -PLANET_RADIUS, position_ws.z);
+
 	// Look for ground
 	float distance_from_camera_to_planet_surface_ws;
-	if (intersect_ray_plane(float3(0.0f, -1.0f, 0.0f), float3(camera_position_ws.x, 0.0, camera_position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
+	if (intersect_ray_plane(float3(0.0f, -1.0f, 0.0f), float3(0.0, 0.0, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
 	{
 		return float4(0.0f, 0.8f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_begin_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(camera_position_ws.x, CLOUD_LAYER_HEIGHT_BEGIN, camera_position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0, CLOUD_LAYER_HEIGHT_BEGIN, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_end_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(camera_position_ws.x, CLOUD_LAYER_HEIGHT_END, camera_position_ws.z), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0, CLOUD_LAYER_HEIGHT_END, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	};
 #else
+	// Position planet such that surface is at origin
+	const float3 planet_center_ws = float3(0.0f, -PLANET_RADIUS, 0.0f);
+
 	// Look for ground
 	float distance_from_camera_to_planet_surface_ws;
 	if (intersect_ray_sphere(planet_center_ws, PLANET_RADIUS, camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
@@ -276,26 +233,6 @@ float4 ps_main(ps_input input) : SV_Target0
 	// TODO: Should the size of each step depend on optical distance? Looking straight up through atmosphere will get the same
 	// number of samples as looking into the horizon.
 	int step_count = 128;
-	//if (debug3 > -0.9)
-	//{
-	//	step_count *= 2;
-	//}
-	//if (debug3 > -0.5)
-	//{
-	//	step_count *= 2;
-	//}
-	//if (debug3 > 0)
-	//{
-	//	step_count *= 2;
-	//}
-	//if (debug3 > 0.5)
-	//{
-	//	step_count *= 2;
-	//}
-	//if (debug3 > 0.9)
-	//{
-	//	step_count *= 2;
-	//}
 
 	const float inverse_step_count = 1.0f / step_count;
 

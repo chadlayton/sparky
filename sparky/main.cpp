@@ -91,7 +91,7 @@ void camera_update(camera* camera, const input& input)
 
 	const math::mat<4> camera_transform = camera_get_transform(*camera);
 
-	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 1000.0f : 1.0f;
+	const float movement_speed_mod = input.current.keys[VK_SHIFT] ? 100.0f : 1.0f;
 
 	if (input.current.keys['A'])
 	{
@@ -605,6 +605,8 @@ int main()
 	sp_texture_handle cloud_detail_texture_handle = sp_texture_create("cloud_detail", { 32, 32, 32, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(cloud_detail_texture_handle, cloud_detail_image_data, 32 * 32 * 32 * 4);
 
+	sp_texture_handle weather_texture_handle = sp_texture_defaults_checkerboard();
+
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
 
@@ -790,8 +792,6 @@ int main()
 			const math::mat<4> projection_matrix = math::create_perspective_fov_rh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix) * jitter_matrix;
 
-			const math::mat<4> test = view_matrix * math::inverse(view_matrix);
-
 			constant_buffer_per_frame_data.view_matrix = view_matrix;
 			constant_buffer_per_frame_data.projection_matrix = projection_matrix;
 			constant_buffer_per_frame_data.view_projection_matrix = view_projection_matrix;
@@ -845,7 +845,7 @@ int main()
 				for (int i = 0; i < scene.meshes.size(); ++i)
 				{
 					{
-						const math::mat<4> world_matrix = math::create_scale(math::vec<3>(600.0, 600.0f, 600.0f));
+						const math::mat<4> world_matrix = math::create_identity<4>();
 
 						constant_buffer_per_object_data.world_matrix = world_matrix;
 
@@ -878,13 +878,14 @@ int main()
 
 				for (int i = 0; i < cube.meshes.size(); ++i)
 				{
-					//{
-					//	const math::mat<4> world_matrix = math::create_identity<4>();
+					// TODO: If I actually wanted a different transform per object then I need to allocate these out of a ring buffer or something.
+					{
+						const math::mat<4> world_matrix = math::create_identity<4>();
 
-					//	constant_buffer_per_object_data.world_matrix = world_matrix;
+						constant_buffer_per_object_data.world_matrix = world_matrix;
 
-					//	sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
-					//}
+						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
+					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
 					if (cube.materials[i].double_sided)
@@ -925,6 +926,7 @@ int main()
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_detail_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(weather_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				// Copy CBV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
