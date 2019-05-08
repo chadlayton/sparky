@@ -22,6 +22,8 @@
 #include "descriptor_impl.h"
 #include "debug_gui_impl.h"
 
+#include "shaders/clouds.cbuffer.hlsli"
+
 #include <string>
 #include <cassert>
 #include <codecvt>
@@ -704,26 +706,7 @@ int main()
 
 	} constant_buffer_per_object_data;
 
-	__declspec(align(16)) struct
-	{
-		float shape_sample_scale_bias;
-		float detail_sample_scale_bias;
-		float density_bias;
-		float coverage_bias;
-		float type_bias;
-		float shape_base_bias;
-		float shape_detail_bias;
-		float extinction_coeff;
-		float scattering_coeff;
-		float debug0;
-		float debug1;
-		float debug2;
-		float debug3;
-		float debug4;
-		float debug5;
-		float debug6;
-
-	} constant_buffer_clouds_per_frame_data;
+	constant_buffer_clouds_per_frame_data constant_buffer_clouds_per_frame_data;
 	memset(&constant_buffer_clouds_per_frame_data, 0, sizeof(constant_buffer_clouds_per_frame_data));
 
 	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) });
@@ -968,15 +951,16 @@ int main()
 			ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
 			ImGui::End();
 			ImGui::Begin("Clouds", &open, window_flags);
-			ImGui::DragFloat("Scale (Base)", &constant_buffer_clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Scale (Detail)", &constant_buffer_clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Density", &constant_buffer_clouds_per_frame_data.density_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Coverage", &constant_buffer_clouds_per_frame_data.coverage_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Type", &constant_buffer_clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Shape (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Shape (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Extinction", &constant_buffer_clouds_per_frame_data.extinction_coeff, 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("Scattering", &constant_buffer_clouds_per_frame_data.scattering_coeff, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Sampling Scale Bias (Weather)", &constant_buffer_clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Sampling Scale Bias (Density)", &constant_buffer_clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			// ImGui::DragFloat("Scale (Detail)", &constant_buffer_clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			// ImGui::DragFloat("Density", &constant_buffer_clouds_per_frame_data.density_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Coverage Bias", &constant_buffer_clouds_per_frame_data.coverage_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Type Bias", &constant_buffer_clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Density Bias (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Density Bias (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Extinction", &constant_buffer_clouds_per_frame_data.extinction_coeff_bias, 0.01f, -1.0f, 0.0f);
+			ImGui::DragFloat("Scattering", &constant_buffer_clouds_per_frame_data.extinction_coeff_bias, 0.01f, -1.0f, 0.0f);
 
 			ImGui::DragFloat("Debug0", &constant_buffer_clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug1", &constant_buffer_clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);

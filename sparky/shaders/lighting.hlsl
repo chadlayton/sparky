@@ -1,6 +1,8 @@
 #include "per_frame_cbuffer.hlsli"
 #include "fullscreen_triangle.hlsli"
 #include "position_from_depth.hlsli"
+#include "tonemap.hlsli"
+#include "gamma_correction.hlsli"
 
 Texture2D gbuffer_base_color_texture : register(t0);
 Texture2D gbuffer_metalness_roughness_texture : register(t1);
@@ -56,31 +58,6 @@ struct directional_light
 	float3 irradiance;	// Power per unit area received by surface with normal facing direction
 };
 
-// https://kosmonautblog.wordpress.com/2017/03/26/designing-a-linear-hdr-pipeline/
-// http://renderwonk.com/blog/index.php/archive/adventures-with-gamma-correct-rendering/
-float3 linear_to_srgb(float3 color)
-{
-	return pow(abs(color), 1.0f / 2.2f);
-}
-
-float3 srgb_to_linear(float3 color)
-{
-	return pow(abs(color), 2.2f);
-}
-
-// http://frictionalgames.blogspot.com/2012/09/tech-feature-hdr-lightning.html
-float3 tonemap_uncharted2(float3 x)
-{
-	float A = 0.15;
-	float B = 0.50;
-	float C = 0.10;
-	float D = 0.20;
-	float E = 0.02;
-	float F = 0.30;
-
-	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
-}
-
 float4 ps_main(ps_input input) : SV_Target0
 {
 	directional_light sun_light;
@@ -131,7 +108,7 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	float3 lighting = direct_lighting + indirect_lighting;
 
-	//lighting = tonemap_uncharted2(lighting);
+	//lighting = tonemap(lighting);
 
 	lighting = linear_to_srgb(lighting);
 
