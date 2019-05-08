@@ -629,7 +629,7 @@ int main()
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::back,
-	});
+		});
 
 	sp_graphics_pipeline_state_handle gbuffer_double_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer_double_sided", {
 		gbuffer_vertex_shader_handle,
@@ -647,7 +647,7 @@ int main()
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::none,
-	});
+		});
 
 	sp_compute_shader_handle low_freq_noise_shader_handle = sp_compute_shader_create({ "shaders/low_freq_noise.hlsl" });
 
@@ -663,7 +663,7 @@ int main()
 		{
 			sp_texture_format::r8g8b8a8,
 		},
-	});
+		});
 
 	sp_vertex_shader_handle lighting_vertex_shader_handle = sp_vertex_shader_create({ "shaders/lighting.hlsl" });
 	sp_pixel_shader_handle lighting_pixel_shader_handle = sp_pixel_shader_create({ "shaders/lighting.hlsl" });
@@ -675,7 +675,7 @@ int main()
 		{
 			sp_texture_format::r8g8b8a8,
 		},
-	});
+		});
 
 	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
 	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
@@ -706,8 +706,7 @@ int main()
 
 	} constant_buffer_per_object_data;
 
-	constant_buffer_clouds_per_frame_data constant_buffer_clouds_per_frame_data;
-	memset(&constant_buffer_clouds_per_frame_data, 0, sizeof(constant_buffer_clouds_per_frame_data));
+	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
 
 	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) });
 	sp_constant_buffer_handle constant_buffer_per_object_handle = sp_constant_buffer_create("per_object", { sizeof(constant_buffer_per_object_data) });
@@ -788,7 +787,7 @@ int main()
 		}
 
 		{
-			sp_constant_buffer_update(constant_buffer_clouds_per_frame_handle, &constant_buffer_clouds_per_frame_data, sizeof(constant_buffer_clouds_per_frame_data));
+			sp_constant_buffer_update(constant_buffer_clouds_per_frame_handle, &clouds_per_frame_data, sizeof(constant_buffer_clouds_per_frame_data));
 		}
 
 		// Record all the commands we need to render the scene into the command list.
@@ -951,21 +950,22 @@ int main()
 			ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
 			ImGui::End();
 			ImGui::Begin("Clouds", &open, window_flags);
-			ImGui::DragFloat("Sampling Scale Bias (Weather)", &constant_buffer_clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Sampling Scale Bias (Density)", &constant_buffer_clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
-			// ImGui::DragFloat("Scale (Detail)", &constant_buffer_clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
-			// ImGui::DragFloat("Density", &constant_buffer_clouds_per_frame_data.density_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Coverage Bias", &constant_buffer_clouds_per_frame_data.coverage_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Type Bias", &constant_buffer_clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Density Bias (Base)", &constant_buffer_clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Density Bias (Detail)", &constant_buffer_clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Extinction", &constant_buffer_clouds_per_frame_data.extinction_coeff_bias, 0.01f, -1.0f, 0.0f);
-			ImGui::DragFloat("Scattering", &constant_buffer_clouds_per_frame_data.extinction_coeff_bias, 0.01f, -1.0f, 0.0f);
-
-			ImGui::DragFloat("Debug0", &constant_buffer_clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Debug1", &constant_buffer_clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Debug2", &constant_buffer_clouds_per_frame_data.debug2, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Debug3", &constant_buffer_clouds_per_frame_data.debug3, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Sampling Scale Bias (Weather)", &clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Sampling Scale Bias (Density)", &clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			// ImGui::DragFloat("Scale (Detail)", &clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			// ImGui::DragFloat("Density", &clouds_per_frame_data.density_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Coverage Bias", &clouds_per_frame_data.coverage_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Type Bias", &clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Density Bias (Base)", &clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Density Bias (Detail)", &clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Extinction", &clouds_per_frame_data.extinction_coeff, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Scattering", &clouds_per_frame_data.scattering_coeff, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Cloud Layer (Begin)", &clouds_per_frame_data.cloud_layer_height_begin);// , 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Cloud Layer (End)", &clouds_per_frame_data.cloud_layer_height_end);// 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Debug0", &clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug1", &clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 0.01f, -1.0f, 1.0f);
 			ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one

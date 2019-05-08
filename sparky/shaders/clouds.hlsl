@@ -13,17 +13,10 @@ Texture2D weather_texture : register(t3);
 
 SamplerState default_sampler : register(s0);
 
-cbuffer constant_buffer_clouds_per_frame : register(b1)
-{
-	constant_buffer_clouds_per_frame_data clouds;
-};
-
 #define PI      3.1415926f
 #define EPSILON 0.000001f
 
 #define PLANET_RADIUS            4000.0f
-#define CLOUD_LAYER_HEIGHT_BEGIN 1500.0f
-#define CLOUD_LAYER_HEIGHT_END   4000.0f
 
 //#define DEBUG_CLOUD_WEATHER_SPHERE
 //#define DEBUG_CLOUD_WEATHER_CYLINDER
@@ -119,7 +112,7 @@ float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sampl
 #else
 	const float sample_height = distance(planet_center_ws, sample_position_ws) - PLANET_RADIUS;
 #endif
-	return saturate((sample_height - CLOUD_LAYER_HEIGHT_BEGIN) / (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN));
+	return saturate((sample_height - cloud_layer_height_begin) / (cloud_layer_height_end - cloud_layer_height_begin));
 }
 
 float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
@@ -127,13 +120,13 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 	sample_position_ws += 100000.0f;
 
 #if defined(DEBUG_CLOUD_WEATHER_CYLINDER)
-	float coverage_base = (distance(sample_position_ws.xz * (1 - clouds.weather_sample_scale_bias), float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
+	float coverage_base = (distance(sample_position_ws.xz * (1 - weather_sample_scale_bias), float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
 #elif defined(DEBUG_CLOUD_WEATHER_SPHERE)
-	float coverage_base = (distance(sample_position_ws * (1 - clouds.weather_sample_scale_bias), float3(0.0, (CLOUD_LAYER_HEIGHT_END - CLOUD_LAYER_HEIGHT_BEGIN) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
+	float coverage_base = (distance(sample_position_ws * (1 - weather_sample_scale_bias), float3(0.0, (cloud_layer_height_end - cloud_layer_height_begin) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
 #elif defined(DEBUG_CLOUD_WEATHER_GRID)
-	float coverage_base = abs((int)(sample_position_ws.x * 0.001 * (1 - clouds.weather_sample_scale_bias)) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 ? 1.0 : 0.0;
+	float coverage_base = abs((int)(sample_position_ws.x * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 ? 1.0 : 0.0;
 #else
-	float coverage_base = weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.0002 * (1 - clouds.weather_sample_scale_bias)).r;
+	float coverage_base = weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.0002 * (1 - weather_sample_scale_bias)).r;
 #endif
 
 	//const float cloud_detail_sample_scale_base = 0.0002f;
@@ -141,9 +134,9 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 
 	const float cloud_shape_sample_scale_base = 0.0002f;
 
-	float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * (cloud_shape_sample_scale_base * (1 - clouds.shape_sample_scale_bias)));
+	float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias)));
 
-	float density = remap(cloud_shape.r + clouds.shape_base_bias, -(1 - (0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a + clouds.shape_detail_bias)), 1.0, 0.0, 1.0f);
+	float density = remap(cloud_shape.r + shape_base_bias, -(1 - (0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a + shape_detail_bias)), 1.0, 0.0, 1.0f);
 
 	density = remap(density, 1 - coverage_base, 1.0, 0.0, 1.0);
 	density *= coverage_base;
@@ -152,14 +145,14 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 
 	return density;
 
-	float coverage = saturate(coverage_base + clouds.coverage_bias);
+	float coverage = saturate(coverage_base + coverage_bias);
 
 	density = apply_cloud_coverage(density, coverage);
 
 	const float height_cl = get_normalized_height_in_cloud_layer(planet_center_ws, sample_position_ws);
 
 	float cloud_type_base = 0.5;
-	float cloud_type = saturate(cloud_type_base + clouds.type_bias);
+	float cloud_type = saturate(cloud_type_base + type_bias);
 
 	density = apply_cloud_type(density, height_cl, cloud_type);
 
@@ -185,13 +178,13 @@ float4 ps_main(ps_input input) : SV_Target0
 	}
 
 	float distance_from_camera_to_cloud_layer_height_begin_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0, CLOUD_LAYER_HEIGHT_BEGIN, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0, cloud_layer_height_begin, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	}
 
 	float distance_from_camera_to_cloud_layer_height_end_ws;
-	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0, CLOUD_LAYER_HEIGHT_END, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
+	if (!intersect_ray_plane(float3(0.0f, 1.0f, 0.0f), float3(0.0, cloud_layer_height_end, 0.0), camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	};
@@ -223,7 +216,7 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	// TODO: Should the size of each step depend on optical distance? Looking straight up through atmosphere will get the same
 	// number of samples as looking into the horizon.
-	int step_count = 128;
+	const int step_count = 128;
 
 	const float inverse_step_count = 1.0f / step_count;
 
@@ -240,9 +233,9 @@ float4 ps_main(ps_input input) : SV_Target0
 
 		float density = sample_cloud_density(planet_center_ws, sample_position_ws);
 
-		extinction *= exp(-density * inverse_step_count * (1.0 + clouds.extinction_coeff_bias));
+		extinction *= exp(-density * inverse_step_count * extinction_coeff);
 
-		scattering += extinction * density * (1.0 + clouds.scattering_coeff_bias) * inverse_step_count;
+		scattering += extinction * density * scattering_coeff * inverse_step_count;
 	}
 
 	float3 sky = float3(0.53, 0.80, 0.92);
