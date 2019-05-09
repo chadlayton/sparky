@@ -958,14 +958,19 @@ int main()
 			ImGui::DragFloat("Type Bias", &clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Density Bias (Base)", &clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Density Bias (Detail)", &clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Extinction", &clouds_per_frame_data.extinction_coeff, 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("Scattering", &clouds_per_frame_data.scattering_coeff, 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("Cloud Layer (Begin)", &clouds_per_frame_data.cloud_layer_height_begin);// , 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("Cloud Layer (End)", &clouds_per_frame_data.cloud_layer_height_end);// 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Extinction", &clouds_per_frame_data.extinction_scale, 0.001f, 0.0f, 1.0f);
+			ImGui::DragFloat("Scattering", &clouds_per_frame_data.scattering_scale, 0.001f, 0.0f, 1.0f);
+			ImGui::DragFloat("Cloud Layer (Begin)", &clouds_per_frame_data.cloud_layer_height_begin);
+			ImGui::DragFloat("Cloud Layer (End)", &clouds_per_frame_data.cloud_layer_height_end);
+			ImGui::DragFloat("Step Size", &clouds_per_frame_data.step_size_ws);
+
+			ImGui::DragInt("Debug Raymarch Termination", &clouds_per_frame_data.debug_raymarch_termination, 1.0f, 0, 1);
+			ImGui::DragInt("Debug Toggle Frostbite Scattering", &clouds_per_frame_data.debug_toggle_frostbite_scattering, 1.0f, 0, 1);
+
 			ImGui::DragFloat("Debug0", &clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug1", &clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 100.01f,  0.0f, 10000.0f);
+			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 100.01f,  0.0f, 10000.0f);
 			ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one

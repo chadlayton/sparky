@@ -16,16 +16,21 @@ CBUFFER_DECLARE(constant_buffer_clouds_per_frame_data, CBUFFER_CLOUDS_REGISTER)
 	float type_bias = 0.0f;
 	float shape_base_bias = 0.0f;
 	float shape_detail_bias = 0.0f;
-	float extinction_coeff = 1.0f;
-	float scattering_coeff = 1.0f;
+	float extinction_scale = 0.01f;
+	float scattering_scale = 0.01f;
 
 	float cloud_layer_height_begin = 1500.0f;
 	float cloud_layer_height_end = 4000.0f;
+
+	float step_size_ws = 100.0f;
 
 	float debug0 = 0.0f;
 	float debug1 = 0.0f;
 	float debug2 = 0.0f;
 	float debug3 = 0.0f;
+
+	int debug_raymarch_termination = 0;
+	int debug_toggle_frostbite_scattering = 0;
 };
 
 #undef CBUFFER_DECLARE
