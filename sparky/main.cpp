@@ -962,11 +962,12 @@ int main()
 			ImGui::DragFloat("Scattering", &clouds_per_frame_data.scattering_scale, 0.001f, 0.0f, 1.0f);
 			ImGui::DragFloat("Cloud Layer (Begin)", &clouds_per_frame_data.cloud_layer_height_begin);
 			ImGui::DragFloat("Cloud Layer (End)", &clouds_per_frame_data.cloud_layer_height_end);
-			ImGui::DragFloat("Step Size", &clouds_per_frame_data.step_size_ws);
-
+			ImGui::DragFloat("Step Size (Cloud)", &clouds_per_frame_data.step_size_ws);
+			ImGui::DragFloat("Step Size (Shadow)", &clouds_per_frame_data.shadow_step_size_ws);
+			ImGui::DragFloat("Light Scale (Ambient)", &clouds_per_frame_data.ambient_light_scale);
+			ImGui::DragFloat("Light Scale (Sun)", &clouds_per_frame_data.sun_light_scale);
 			ImGui::DragInt("Debug Raymarch Termination", &clouds_per_frame_data.debug_raymarch_termination, 1.0f, 0, 1);
 			ImGui::DragInt("Debug Toggle Frostbite Scattering", &clouds_per_frame_data.debug_toggle_frostbite_scattering, 1.0f, 0, 1);
-
 			ImGui::DragFloat("Debug0", &clouds_per_frame_data.debug0, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug1", &clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 100.01f,  0.0f, 10000.0f);
