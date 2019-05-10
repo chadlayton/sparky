@@ -105,7 +105,8 @@ float apply_cloud_coverage(float density, float cloud_coverage)
 	return density;
 }
 
-float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sample_position_ws)
+// The height signal ranges from 0 at the bottom of the cloud layer to 1 at the top
+float cloud_layer_height_signal(float3 sample_position_ws, float3 planet_center_ws)
 {
 #if defined(DEBUG_PLANET_FLAT)
 	const float sample_height = sample_position_ws.y;
@@ -115,7 +116,7 @@ float get_normalized_height_in_cloud_layer(float3 planet_center_ws, float3 sampl
 	return saturate((sample_height - cloud_layer_height_begin) / (cloud_layer_height_end - cloud_layer_height_begin));
 }
 
-float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
+float sample_cloud_density(float3 sample_position_ws, float height_signal)
 {
 	sample_position_ws += 100000.0f;
 
@@ -149,14 +150,17 @@ float sample_cloud_density(float3 planet_center_ws, float3 sample_position_ws)
 
 	density = apply_cloud_coverage(density, coverage);
 
-	const float height_cl = get_normalized_height_in_cloud_layer(planet_center_ws, sample_position_ws);
-
 	float cloud_type_base = 0.5;
 	float cloud_type = saturate(cloud_type_base + type_bias);
 
-	density = apply_cloud_type(density, height_cl, cloud_type);
+	density = apply_cloud_type(density, height_signal, cloud_type);
 
 	return saturate(1 - density);
+}
+
+float hg(float cos_theta, float g)
+{
+	return (1.0 / 4.0 * PI) * ((1 - g * g) / pow(1 + g * g - 2 * g * cos_theta, 3.0 / 2.0));
 }
 
 /*
@@ -308,9 +312,11 @@ float4 ps_main(ps_input input) : SV_Target0
 	};
 #endif
 
-	// const float3 direction_to_light_ws = normalize(-sun_direction_ws);
+	const float3 direction_to_light_ws = normalize(-sun_direction_ws);
+	const float cos_theta = dot(direction_from_camera_ws, direction_to_light_ws);
 
 	const int step_count_max = 128;
+	const int light_step_count_max = 4;
 
 	float3 scattering = float3(0.0, 0.0, 0.0);
 	float transmittance = 1.0f;
@@ -319,45 +325,79 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	int debug_raymarch_termination_result = 0;
 
+	bool raymarch_terminated = false;
+
 	for (int i = 0; i < step_count_max; ++i)
 	{
 		const float3 sample_position_ws = camera_position_ws + direction_from_camera_ws * sample_distance_ws;
+		const float sample_height_signal = cloud_layer_height_signal(sample_position_ws, planet_center_ws);
 
-		const float density = sample_cloud_density(planet_center_ws, sample_position_ws);
-		if (density > EPSILON)
+		const float sample_density = sample_cloud_density(sample_position_ws, sample_height_signal);
+		if (sample_density > EPSILON)
 		{
-			const float extinction_coeff = density * extinction_scale;
-			const float scattering_coeff = density * scattering_scale;
+			float3 lighting = float3(1.0f, 1.0f, 1.0f);
+#if 0
+			{
+				const float phase = lerp(hg(cos_theta, 0.8), hg(cos_theta, -0.5), 0.5);
 
-			const float T = exp(-extinction_coeff * step_size_ws);
+				/*
+				float light_sample_distance_ws = 0;
+
+				for (int j = 0; j < sun_step_count_max; ++j)
+				{
+					const float light_sample_position_ws = sample_position_ws + direction_to_light_ws * light_sample_distance_ws;
+
+					const float light_sample_density = sample_cloud_density(planet_center_ws, light_sample_position_ws);
+					if (light_sample_density > EPSILON)
+					{
+						light_sample_distance_ws += light_step_size_ws;
+					}
+				}*/
+
+				float shadow = sample_height_signal;
+
+				lighting = float3(1.0, 0.9, 0.5) /** 600.0*/ * phase * shadow;
+			}
+#endif
+
+			const float scattering_coeff = sample_density * scattering_scale;
+			const float3 scattering_at_step = lighting * scattering_coeff;
+
+			const float extinction_coeff = sample_density * extinction_scale;
+			const float transmittance_at_step = exp(-extinction_coeff * step_size_ws);
 
 			if (debug_toggle_frostbite_scattering)
 			{
-				float S = scattering_coeff;
-				scattering += transmittance * ((S - S * T) / extinction_coeff);
+				scattering += transmittance_at_step * ((scattering_at_step - scattering_at_step * transmittance_at_step) / extinction_coeff);
 			}
 			else
 			{
-				scattering += transmittance * scattering_coeff * step_size_ws;
+				scattering += transmittance_at_step * scattering_at_step * step_size_ws;
 			}
 
-			transmittance *= T;
+			transmittance *= transmittance_at_step;
 		}
 
 		sample_distance_ws += step_size_ws;
 
 		if (transmittance < EPSILON)
 		{
+			raymarch_terminated = true;
+
 			if (debug_raymarch_termination && debug_raymarch_termination_result == 0) debug_raymarch_termination_result = 1;
 		}
 
 		if (sample_distance_ws >= distance_from_camera_to_cloud_layer_height_end_ws)
 		{
+			raymarch_terminated = true;
+
 			if (debug_raymarch_termination && debug_raymarch_termination_result == 0) debug_raymarch_termination_result = 2;
 		}
 
 		if (i == step_count_max - 1)
 		{
+			raymarch_terminated = true;
+
 			if (debug_raymarch_termination && debug_raymarch_termination_result == 0) debug_raymarch_termination_result = 3;
 		}
 	}
