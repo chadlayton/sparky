@@ -18,6 +18,8 @@ SamplerState default_sampler : register(s0);
 
 #define PLANET_RADIUS            4000.0f
 
+//#define ENABLE_RAYMARCH_DEBUGGING
+
 //#define DEBUG_CLOUD_WEATHER_SPHERE
 //#define DEBUG_CLOUD_WEATHER_CYLINDER
 //#define DEBUG_CLOUD_WEATHER_GRID
@@ -247,9 +249,11 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	float sample_distance_ws = distance_from_camera_to_cloud_layer_height_begin_ws;
 
-	int debug_raymarch_termination_reason = 0;
-
 	bool raymarch_terminated = false;
+
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+	int debug_raymarch_termination_reason = 0;
+#endif
 
 	[unroll(step_count_max)]
 	for (int i = 0; i < step_count_max; ++i)
@@ -262,81 +266,135 @@ float4 ps_main(ps_input input) : SV_Target0
 			const float sample_density = sample_cloud_density(sample_position_ws, sample_height_signal);
 			if (sample_density > EPSILON)
 			{
-				float3 light = float3(1.0, 1.0, 1.0);
+				bool shadow_raymarch_terminated = false;
+
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+				int debug_raymarch_shadow_termination_reason = 0;
+#endif
+
+				float shadow = 1.0;
 				{
-					const float phase = lerp(hg(cos_theta, 0.8), hg(cos_theta, -0.5), 0.5);
-
-					float shadow = 1.0;
-
 					float shadow_sample_distance_ws = shadow_step_size_ws;
 
 					[unroll(shadow_step_count_max)]
 					for (int j = 0; j < shadow_step_count_max; ++j)
 					{
-						const float3 shadow_sample_position_ws = sample_position_ws + direction_to_light_ws * shadow_sample_distance_ws;
-						const float shadow_sample_height_signal = cloud_layer_height_signal(shadow_sample_position_ws, planet_center_ws);
+						if (!shadow_raymarch_terminated)
+						{
+							const float3 shadow_sample_position_ws = sample_position_ws + direction_to_light_ws * shadow_sample_distance_ws;
+							const float shadow_sample_height_signal = cloud_layer_height_signal(shadow_sample_position_ws, planet_center_ws);
 
-						const float shadow_sample_density = sample_cloud_density(shadow_sample_position_ws, shadow_sample_height_signal);
+							const float shadow_sample_density = sample_cloud_density(shadow_sample_position_ws, shadow_sample_height_signal);
 
-						const float extinction_coeff = shadow_sample_density * extinction_scale;
-						const float shadow_at_step = exp(-extinction_coeff * shadow_step_size_ws);
+							const float scattering_coeff = shadow_sample_density * scattering_factor;
+							const float absorption_coeff = shadow_sample_density * absorption_factor;
+							const float extinction_coeff = scattering_coeff + absorption_coeff;
 
-						shadow *= shadow_at_step;
+							const float shadow_at_step = exp(-extinction_coeff * shadow_step_size_ws);
 
-						shadow_sample_distance_ws += shadow_step_size_ws;
+							shadow *= shadow_at_step;
+
+							if (shadow < EPSILON)
+							{
+								shadow_raymarch_terminated = true;
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+								debug_raymarch_shadow_termination_reason = 1;
+#endif
+							}
+
+#if defined(DEBUG_PLANET_FLAT)
+							if (shadow_sample_position_ws.y > cloud_layer_height_end)
+#else
+#error "Need to cast ray from sample through cloud layer in direction of sun"
+#endif
+							{
+								shadow_raymarch_terminated = true;
+
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+								debug_raymarch_shadow_termination_reason = 2;
+#endif
+							}
+
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+							if (j == shadow_step_count_max - 1)
+							{
+								shadow_raymarch_terminated = true;
+
+								debug_raymarch_shadow_termination_reason = 3;
+							}
+#endif
+
+							shadow_sample_distance_ws += shadow_step_size_ws;
+						}
 					}
-
-					const float3 light_color = float3(1.0, 1.0, 1.0) * sun_light_scale;
-
-					const float3 ambient_color = float3(1.0, 1.0, 1.0) * distance(sample_height_signal, 0.5) * 2.0 * ambient_light_scale;
-
-					light = light_color * phase * shadow + ambient_color;
 				}
 
-				const float scattering_coeff = sample_density * scattering_scale;
-				const float3 scattering_at_step = light * scattering_coeff;
-
-				const float extinction_coeff = sample_density * extinction_scale;
-				const float transmittance_at_step = exp(-extinction_coeff * step_size_ws);
-
-				if (debug_toggle_frostbite_scattering)
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+				if (debug_shadow_raymarch_termination && debug_shadow_raymarch_termination_step == i && shadow_raymarch_terminated)
 				{
-					scattering += transmittance_at_step * ((scattering_at_step - scattering_at_step * transmittance_at_step) / extinction_coeff);
+					raymarch_terminated = true;
+
+					debug_raymarch_termination_reason = debug_raymarch_shadow_termination_reason;
 				}
 				else
+#endif
 				{
-					scattering += transmittance_at_step * scattering_at_step * step_size_ws;
-				}
+					const float phase = lerp(hg(cos_theta, 0.8), hg(cos_theta, -0.5), 0.5);
+					const float3 light = sun_light.xxx * phase * shadow + ambient_light.xxx;
 
-				transmittance *= transmittance_at_step;
+					const float scattering_coeff = sample_density * scattering_factor;
+					const float absorption_coeff = sample_density * absorption_factor;
+					const float extinction_coeff = scattering_coeff + absorption_coeff;
+
+					const float3 scattering_at_step = light * scattering_coeff;
+					const float transmittance_at_step = exp(-extinction_coeff * step_size_ws);
+
+					if (debug_toggle_frostbite_scattering)
+					{
+						scattering += transmittance * ((scattering_at_step - scattering_at_step * transmittance_at_step) / extinction_coeff);
+					}
+					else
+					{
+						scattering += transmittance * scattering_at_step * step_size_ws;
+					}
+
+					transmittance *= transmittance_at_step;
+				}
 			}
 
 			if (transmittance < EPSILON)
 			{
 				raymarch_terminated = true;
 
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
 				debug_raymarch_termination_reason = 1;
+#endif
 			}
 
 			if (sample_distance_ws >= distance_from_camera_to_cloud_layer_height_end_ws)
 			{
 				raymarch_terminated = true;
 
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
 				debug_raymarch_termination_reason = 2;
+#endif
 			}
 
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
 			if (i == step_count_max - 1)
 			{
 				raymarch_terminated = true;
 
 				debug_raymarch_termination_reason = 3;
 			}
+#endif
 
 			sample_distance_ws += step_size_ws;
 		}
 	}
 
-	if (raymarch_terminated && debug_raymarch_termination)
+#if defined(ENABLE_RAYMARCH_DEBUGGING)
+	if (raymarch_terminated && (debug_raymarch_termination || debug_shadow_raymarch_termination))
 	{
 		switch (debug_raymarch_termination_reason)
 		{
@@ -346,6 +404,7 @@ float4 ps_main(ps_input input) : SV_Target0
 		default: return float4(0.0, 0.0, 0.0, 1.0); // ??
 		}
 	}
+#endif
 
 	return float4(background * transmittance + tonemap(scattering), 1.0);
 }

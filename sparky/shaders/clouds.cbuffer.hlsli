@@ -16,14 +16,14 @@ CBUFFER_DECLARE(constant_buffer_clouds_per_frame_data, CBUFFER_CLOUDS_REGISTER)
 	float type_bias = 0.0f;
 	float shape_base_bias = 0.0f;
 	float shape_detail_bias = 0.0f;
-	float extinction_scale = 0.01f;
-	float scattering_scale = 0.01f;
+	float absorption_factor = 0.01f;
+	float scattering_factor = 0.01f;
 
 	float cloud_layer_height_begin = 1500.0f;
 	float cloud_layer_height_end = 4000.0f;
 
-	float ambient_light_scale = 1.0f;
-	float sun_light_scale = 1.0f;
+	float ambient_light = 1.0f;
+	float sun_light = 100.0f;
 
 	float step_size_ws = 100.0f;
 	float shadow_step_size_ws = 100.0f;
@@ -34,6 +34,8 @@ CBUFFER_DECLARE(constant_buffer_clouds_per_frame_data, CBUFFER_CLOUDS_REGISTER)
 	float debug3 = 0.0f;
 
 	int debug_raymarch_termination = 0;
+	int debug_shadow_raymarch_termination = 0;
+	int debug_shadow_raymarch_termination_step = 0;
 	int debug_toggle_frostbite_scattering = 0;
 };
 
