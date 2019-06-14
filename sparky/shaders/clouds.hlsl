@@ -5,6 +5,7 @@
 #include "tonemap.hlsli"
 #include "gamma_correction.hlsli"
 #include "clouds.cbuffer.hlsli"
+#include "intersect.hlsli"
 
 Texture2D gbuffer_depth_texture : register(t0);
 Texture3D cloud_shape_texture : register(t1);
@@ -16,83 +17,19 @@ SamplerState default_sampler : register(s0);
 #define PI      3.1415926f
 #define EPSILON 0.000001f
 
-#define PLANET_RADIUS            4000.0f
-
 //#define ENABLE_RAYMARCH_DEBUGGING
-
-//#define DEBUG_CLOUD_WEATHER_SPHERE
-//#define DEBUG_CLOUD_WEATHER_CYLINDER
-//#define DEBUG_CLOUD_WEATHER_GRID
-
-#define DEBUG_PLANET_FLAT
 
 float remap(float original_value, float original_min, float original_max, float new_min, float new_max)
 {
 	return new_min + (((original_value - original_min) / (original_max - original_min)) * (new_max - new_min));
 }
 
-bool intersect_ray_sphere(float3 sphere_center, float sphere_radius, float3 ray_origin, float3 ray_dir, out float t)
-{
-	const float3 L = sphere_center - ray_origin;
-	const float t_ca = dot(L, ray_dir);
-	const float d2 = dot(L, L) - t_ca * t_ca;
-	const float r2 = sphere_radius * sphere_radius;
-
-	if (d2 > r2)
-	{
-		t = 0.0;
-		return false;
-	}
-
-	const float t_hc = sqrt(r2 - d2);
-
-	float t_0 = t_ca - t_hc;
-	float t_1 = t_ca + t_hc;
-
-	if (t_0 > t_1)
-	{
-		const float temp = t_1;
-		t_0 = t_1;
-		t_1 = temp;
-	}
-
-	if (t_0 < 0)
-	{
-		t_0 = t_1;
-
-		if (t_0 < 0)
-		{
-			t = 0.0;
-			return false;
-		}
-	}
-
-	t = t_0;
-
-	return true;
-}
-
-bool intersect_ray_plane(float3 plane_normal, float3 point_on_plane, float3 ray_origin, float3 ray_dir, out float t)
-{
-	float d = dot(ray_dir, plane_normal);
-
-	if (d <= 0)
-	{
-		t = 0.0;
-		return false;
-	}
-
-	t = dot(point_on_plane - ray_origin, plane_normal) / d;
-
-	return true;
-}
-
 // cloud type controls the the height of the cloud which in turn defines how billowy vs how wispy it is
-float apply_cloud_type(float density, float height_cl, float cloud_type)
+float apply_cloud_type(float density, float height_signal, float cloud_type)
 {
-	const float cumulus = saturate(remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.7, 0.9, 1.0, 0.0));
-	const float stratocumulus = saturate(remap(height_cl, 0.0, 0.2, 0.0, 1.0) * remap(height_cl, 0.2, 0.7, 1.0, 0.0));
-	const float stratus = saturate(remap(height_cl, 0.0, 0.1, 0.0, 1.0) * remap(height_cl, 0.2, 0.3, 1.0, 0.0));
+	const float cumulus = saturate(remap(height_signal, 0.0, 0.2, 0.0, 1.0) * remap(height_signal, 0.7, 0.9, 1.0, 0.0));
+	const float stratocumulus = saturate(remap(height_signal, 0.0, 0.2, 0.0, 1.0) * remap(height_signal, 0.2, 0.7, 1.0, 0.0));
+	const float stratus = saturate(remap(height_signal, 0.0, 0.1, 0.0, 1.0) * remap(height_signal, 0.2, 0.3, 1.0, 0.0));
 
 	const float stratus_to_stratocumulus = lerp(stratus, stratocumulus, saturate(cloud_type * 2.0));
 	const float stratocumulus_to_cumulus = lerp(stratocumulus, cumulus, saturate((cloud_type - 0.5) * 2.0));
@@ -111,29 +48,18 @@ float apply_cloud_coverage(float density, float cloud_coverage)
 }
 
 // The height signal ranges from 0 at the bottom of the cloud layer to 1 at the top
-float cloud_layer_height_signal(float3 sample_position_ws, float3 planet_center_ws)
+float cloud_layer_height_signal(float3 sample_position_ws)
 {
-#if defined(DEBUG_PLANET_FLAT)
 	const float sample_height = sample_position_ws.y;
-#else
-	const float sample_height = distance(planet_center_ws, sample_position_ws) - PLANET_RADIUS;
-#endif
+
 	return saturate((sample_height - cloud_layer_height_begin) / (cloud_layer_height_end - cloud_layer_height_begin));
 }
 
-float sample_cloud_density(float3 sample_position_ws, float height_signal)
+float sample_cloud_density(float3 sample_position_ws)
 {
-	sample_position_ws += 100000.0f;
+	sample_position_ws.xz += 100000.0f;
 
-#if defined(DEBUG_CLOUD_WEATHER_CYLINDER)
-	const float coverage_base = (distance(sample_position_ws.xz * (1 - weather_sample_scale_bias), float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
-#elif defined(DEBUG_CLOUD_WEATHER_SPHERE)
-	const float coverage_base = (distance(sample_position_ws * (1 - weather_sample_scale_bias), float3(0.0, (cloud_layer_height_end - cloud_layer_height_begin) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
-#elif defined(DEBUG_CLOUD_WEATHER_GRID)
-	const float coverage_base = abs((int)(sample_position_ws.x * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 ? 1.0 : 0.0;
-#else
-	const float coverage_base = cloud_weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.00002 * (1 - weather_sample_scale_bias)).r;
-#endif
+	const float height_signal = cloud_layer_height_signal(sample_position_ws);
 
 	const float cloud_shape_sample_scale_base = 0.0002f;
 	const float cloud_shape_sample_scale = (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias));
@@ -148,6 +74,9 @@ float sample_cloud_density(float3 sample_position_ws, float height_signal)
 	const float cloud_type = saturate(cloud_type_base + type_bias);
 	density = apply_cloud_type(density, height_signal, cloud_type);
 
+	float4 cloud_weather_data = cloud_weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.00002 * (1 - weather_sample_scale_bias));
+
+	const float coverage_base = cloud_weather_data.r;
 	const float coverage = saturate(coverage_base + coverage_bias);
 	density = apply_cloud_coverage(density, coverage);
 
@@ -175,9 +104,6 @@ float4 ps_main(ps_input input) : SV_Target0
 	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, projection_matrix, inverse_view_projection_matrix);
 
 	const float3 direction_from_camera_ws = normalize(position_ws - camera_position_ws);
-
-#if defined(DEBUG_PLANET_FLAT)
-	const float3 planet_center_ws = float3(position_ws.x, -PLANET_RADIUS, position_ws.z);
 
 	// Look for ground
 	float distance_from_camera_to_planet_surface_ws;
@@ -212,29 +138,6 @@ float4 ps_main(ps_input input) : SV_Target0
 	{
 		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	}
-#else
-	// Position planet such that surface is at origin
-	const float3 planet_center_ws = float3(0.0f, -PLANET_RADIUS, 0.0f);
-
-	// Look for ground
-	float distance_from_camera_to_planet_surface_ws;
-	if (intersect_ray_sphere(planet_center_ws, PLANET_RADIUS, camera_position_ws, direction_from_camera_ws, distance_from_camera_to_planet_surface_ws))
-	{
-		return float4(0.0f, 0.8f, 0.0f, 1.0f);
-	}
-
-	float distance_from_camera_to_cloud_layer_height_begin_ws;
-	if (!intersect_ray_sphere(planet_center_ws, PLANET_RADIUS + CLOUD_LAYER_HEIGHT_BEGIN, camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_begin_ws))
-	{
-		return float4(1.0f, 0.0f, 0.0f, 1.0f);
-	}
-
-	float distance_from_camera_to_cloud_layer_height_end_ws;
-	if (!intersect_ray_sphere(planet_center_ws, PLANET_RADIUS + CLOUD_LAYER_HEIGHT_END, camera_position_ws, direction_from_camera_ws, distance_from_camera_to_cloud_layer_height_end_ws))
-	{
-		return float4(1.0f, 0.0f, 0.0f, 1.0f);
-	};
-#endif
 
 	const float3 direction_to_light_ws = normalize(-sun_direction_ws);
 	const float cos_theta = dot(direction_from_camera_ws, direction_to_light_ws);
@@ -259,9 +162,7 @@ float4 ps_main(ps_input input) : SV_Target0
 		if (!raymarch_terminated)
 		{
 			const float3 sample_position_ws = camera_position_ws + direction_from_camera_ws * sample_distance_ws;
-			const float sample_height_signal = cloud_layer_height_signal(sample_position_ws, planet_center_ws);
-
-			const float sample_density = sample_cloud_density(sample_position_ws, sample_height_signal);
+			const float sample_density = sample_cloud_density(sample_position_ws);
 			if (sample_density > EPSILON)
 			{
 				bool shadow_raymarch_terminated = false;
@@ -280,9 +181,7 @@ float4 ps_main(ps_input input) : SV_Target0
 						if (!shadow_raymarch_terminated)
 						{
 							const float3 shadow_sample_position_ws = sample_position_ws + direction_to_light_ws * shadow_sample_distance_ws;
-							const float shadow_sample_height_signal = cloud_layer_height_signal(shadow_sample_position_ws, planet_center_ws);
-
-							const float shadow_sample_density = sample_cloud_density(shadow_sample_position_ws, shadow_sample_height_signal);
+							const float shadow_sample_density = sample_cloud_density(shadow_sample_position_ws);
 
 							const float scattering_coeff = shadow_sample_density * scattering_factor;
 							const float absorption_coeff = shadow_sample_density * absorption_factor;
@@ -300,11 +199,7 @@ float4 ps_main(ps_input input) : SV_Target0
 #endif
 							}
 
-#if defined(DEBUG_PLANET_FLAT)
 							if (shadow_sample_position_ws.y > cloud_layer_height_end)
-#else
-#error "Need to cast ray from sample through cloud layer in direction of sun"
-#endif
 							{
 								shadow_raymarch_terminated = true;
 
@@ -404,7 +299,11 @@ float4 ps_main(ps_input input) : SV_Target0
 	}
 #endif
 
-	return float4(background * transmittance + tonemap(scattering), 1.0);
+	// Tonemap and then gamma correct
+	scattering = tonemap(scattering);
+	scattering = srgb_to_linear(scattering);
+
+	return float4(background * transmittance + scattering, 1.0);
 }
 
 // https://graphics.pixar.com/library/ProductionVolumeRendering/paper.pdf
@@ -415,97 +314,3 @@ float4 ps_main(ps_input input) : SV_Target0
 // https://cgl.ethz.ch/teaching/former/scivis_07/Notes/stuff/StuttgartCourse/VIS-Modules-06-Direct_Volume_Rendering.pdf
 // https://www.addymotion.com/projects/code/clouds/
 // http://www.cse.chalmers.se/~uffe/xjobb/RurikH%C3%B6gfeldt.pdf
-
-/*
-Production Volume Rendering (SIGGRAPH 2017) Notes
-
---------------------------------------------------------------------------------------
-Symbol                 Description
---------------------------------------------------------------------------------------
-x                      Position
-t                      Ray parameter
-omega                  Ray direction
-x_t                    Parameterized position along a ray: x_t = x + t * omega
---------------------------------------------------------------------------------------
-sigma_a(x)             Absorption coefficient
-sigma_s(x)             Scattering coefficient
-sigma_t(x)             Extinction coefficient: sigma_t(x) = sigma_a(x) + sigma_s(x)
-alpha(x)               Single scattering albedo: alpha(x) = sigma_s(x) / sigma_t(x)
-f_p(x, omega, omega')  Phase function
---------------------------------------------------------------------------------------
-d                      Ray length/domain of volume integration: 0 < t < d
-xi, zeta               Random numbers
-L(x, omega)            Radiance at x in direction omega
-L_d(x_d, omega)        Incident boundary radiance at end of ray
-L_e(x, omega)          Emitted radiance
-L_s(x, omega)          In-scattered radiance at x from direction omega
---------------------------------------------------------------------------------------
-
-2 VOLUME RENDERING THEORY
-
-2.1 Properties of Volumes
-
-The chance of a photon collision is defined by a coefficient sigma(x), the probability
-density of collision per unit distance traveled inside the volume. The unit of a
-collision coefficient is inverse length. Alternatively, can be represented as
-"mean free path", the average distance traveled between collisions.
-
-Absorption:
-The absorption coefficient sigma_a(x) describes a collision where the photon i
-absorbed by the volume (e.g. converted to heat).
-
-Scattering:
-The scattering coefficient sigma_s(x) describes a collision where the photon is
-scattered in a different direction defined by the phase function. The radiance of the
-photon is unchanged. Any change in radiance is modeled with absorption (or emission).
-
-Phase function:
-The phase function f_p(x, omega, omega') is the angular distribution of radiance
-scattered. Usually modeled as a 1D function of the angle theta between the two
-directions.  To be energy conserving phase functions needs to be normalized over the
-sphere:
-
-	int_{S^2} f_p(x, omega, omega') dtheta = 1
-
-An isotropic volume has an equal probability of scattering incoming light in any
-direction and has the associated phase function:
-
-	f_p(x, theta) = 1 / 4pi
-
-Phase functions are usually modeled with the Henyey-Greenstein phase function:
-
-	f_p(x, theta) = (1 / 4pi) * ((1 - g^2) / (1 + g^2 - 2 * g * cos(theta))^(3/2))
-
-The single parameter g [-1..1] can be understood as the average cosine of the
-scattering direction and controls the asymmetry of the phase function. It can model
-backwards scattering (g < 0), isotropic scattering (g = 0), and forward
-scattering (g > 0). It can be perfectly importance sampled.
-
-2.1.1 Extinction and Single Scattering Parametrization
-
-In many cases it is desriable to choose a different parameterization than absorption
-and scattering coefficients. We can define the extinction coeffficient
-sigma_t = sigma_a + sigma_s (sometimes called attenuation cofficient or simply density).
-In addition we define the single scattering albedo alpha(x) = sigma_s(x) / sigma_t(x).
-An alpha(x) = 0 means all radiance is absorbed (such as black coal dust) and alpha(x) = 1
-means no absorption occurs and we have lossless scattering (such as clouds).
-
-2.4 PDF APPROACH
-
-	L(x, omega) = int_{t=0}{d}T(t) sigma_s(x_t)L_s(x_s, omega) dt + T(d)L_d(x_d, omega)
-
-The transmittance term T(t)
-
-	T(t) = exp(-/int_{s=0}{t} sigma_t(x_s) ds)
-
-is the transmittance from the origin x of the ray to the position x_t = x - t * omega
-on the ray parameterized by t. The transmittance T(t) is the net reduction factor from
-absorption and out-scattering between x and x_t.
-
-2.4.1 Transmittance Estimators
-
-Ray Marching Transmittance Estimator:
-The transmittance can be estimated with quadrature instad of Monte Carlo, marching along
-the ray and accumulating the transmittance. This introduces bias even if he marching is
-jittered resulting in artifacts if the volume structure is undersampled.
-*/
