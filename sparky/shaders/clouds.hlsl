@@ -9,7 +9,7 @@
 Texture2D gbuffer_depth_texture : register(t0);
 Texture3D cloud_shape_texture : register(t1);
 Texture3D cloud_detail_texture : register(t2);
-Texture2D weather_texture : register(t3);
+Texture2D cloud_weather_texture : register(t3);
 
 SamplerState default_sampler : register(s0);
 
@@ -126,41 +126,39 @@ float sample_cloud_density(float3 sample_position_ws, float height_signal)
 	sample_position_ws += 100000.0f;
 
 #if defined(DEBUG_CLOUD_WEATHER_CYLINDER)
-	float coverage_base = (distance(sample_position_ws.xz * (1 - weather_sample_scale_bias), float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
+	const float coverage_base = (distance(sample_position_ws.xz * (1 - weather_sample_scale_bias), float2(0.0, 0.0)) < 1000) ? 1.0 : 0.0;
 #elif defined(DEBUG_CLOUD_WEATHER_SPHERE)
-	float coverage_base = (distance(sample_position_ws * (1 - weather_sample_scale_bias), float3(0.0, (cloud_layer_height_end - cloud_layer_height_begin) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
+	const float coverage_base = (distance(sample_position_ws * (1 - weather_sample_scale_bias), float3(0.0, (cloud_layer_height_end - cloud_layer_height_begin) / 2.0, 0.0)) < 1000) ? 1.0 : 0.0;
 #elif defined(DEBUG_CLOUD_WEATHER_GRID)
-	float coverage_base = abs((int)(sample_position_ws.x * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 ? 1.0 : 0.0;
+	const float coverage_base = abs((int)(sample_position_ws.x * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 && abs((int)(sample_position_ws.z * 0.001 * (1 - weather_sample_scale_bias)) % 4) == 0 ? 1.0 : 0.0;
 #else
-	float coverage_base = weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.0002 * (1 - weather_sample_scale_bias)).r;
+	const float coverage_base = cloud_weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.00002 * (1 - weather_sample_scale_bias)).r;
 #endif
 
-	//const float cloud_detail_sample_scale_base = 0.0002f;
-	//float4 cloud_detail = cloud_detail_texture.Sample(default_sampler, sample_position_ws * (cloud_detail_sample_scale_base * (1 - detail_sample_scale_bias)));
-
 	const float cloud_shape_sample_scale_base = 0.0002f;
+	const float cloud_shape_sample_scale = (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias));
+	const float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * cloud_shape_sample_scale);
 
-	float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias)));
+	float density = cloud_shape.r;
 
-	float density = remap(cloud_shape.r + shape_base_bias, -(1 - (0.625 * cloud_shape.g + 0.25 * cloud_shape.b + 0.125 * cloud_shape.a + shape_detail_bias)), 1.0, 0.0, 1.0f);
+	const float cloud_shape_erosion_fbm = saturate((cloud_shape.g * 0.625 + cloud_shape.b * 0.25 + cloud_shape.a * 0.125) + shape_base_erosion_bias);
+	density = remap(density + shape_base_bias, -(1 - cloud_shape_erosion_fbm), 1.0, 0.0, 1.0f);
 
-	density = remap(density, 1 - coverage_base, 1.0, 0.0, 1.0);
-	density *= coverage_base;
-
-	density = saturate(density);
-
-	return density;
-
-	float coverage = saturate(coverage_base + coverage_bias);
-
-	density = apply_cloud_coverage(density, coverage);
-
-	float cloud_type_base = 0.5;
-	float cloud_type = saturate(cloud_type_base + type_bias);
-
+	const float cloud_type_base = 0.5;
+	const float cloud_type = saturate(cloud_type_base + type_bias);
 	density = apply_cloud_type(density, height_signal, cloud_type);
 
-	return saturate(1 - density);
+	const float coverage = saturate(coverage_base + coverage_bias);
+	density = apply_cloud_coverage(density, coverage);
+
+	//const float cloud_detail_sample_scale_base = 0.0002f;
+	//const float cloud_detail_sample_scale = (cloud_detail_sample_scale_base * (1 - detail_sample_scale_bias));
+	//const float4 cloud_detail = cloud_detail_texture.Sample(default_sampler, sample_position_ws * cloud_detail_sample_scale);
+
+	//const float cloud_detail_erosion_fbm = saturate((cloud_detail.r * 0.625 + cloud_detail.g * 0.25 + cloud_detail.b * 0.125) + shape_detail_erosion_bias);
+	//density = remap(density + shape_detail_bias, 1 - cloud_detail_erosion_fbm, 1.0f, 0.0, 1.0);
+
+	return saturate(density);
 }
 
 float hg(float cos_theta, float g)
@@ -255,7 +253,7 @@ float4 ps_main(ps_input input) : SV_Target0
 	int debug_raymarch_termination_reason = 0;
 #endif
 
-	[unroll(step_count_max)]
+	[loop]// [unroll(step_count_max)]
 	for (int i = 0; i < step_count_max; ++i)
 	{
 		if (!raymarch_terminated)
@@ -276,7 +274,7 @@ float4 ps_main(ps_input input) : SV_Target0
 				{
 					float shadow_sample_distance_ws = shadow_step_size_ws;
 
-					[unroll(shadow_step_count_max)]
+					[loop] //[unroll(shadow_step_count_max)]
 					for (int j = 0; j < shadow_step_count_max; ++j)
 					{
 						if (!shadow_raymarch_terminated)

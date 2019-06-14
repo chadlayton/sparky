@@ -516,7 +516,11 @@ struct sp_render_pass_desc
 
 void* sp_image_load_from_file(const char* filename)
 {
-	return nullptr;
+	int image_width, image_height, image_channels;
+	stbi_uc* image_data = stbi_load(filename, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
+	assert(image_data);
+
+	return image_data;
 }
 
 void* sp_image_volume_load_from_directory(const char* dirname, const char* format, int size)
@@ -525,8 +529,8 @@ void* sp_image_volume_load_from_directory(const char* dirname, const char* forma
 	const int volume_height = size;
 	const int volume_depth = size;
 
-	int image_slice_size_bytes = volume_width * volume_height * 4;
-	int image_volume_size_bytes = image_slice_size_bytes * volume_depth;
+	const int image_slice_size_bytes = volume_width * volume_height * 4; // TODO: Assuming 4bpp
+	const int image_volume_size_bytes = image_slice_size_bytes * volume_depth;
 
 	uint8_t* image_volume_data = static_cast<uint8_t*>(malloc(image_volume_size_bytes));
 
@@ -539,6 +543,8 @@ void* sp_image_volume_load_from_directory(const char* dirname, const char* forma
 		int image_slice_width, image_slice_height, image_slice_channels;
 		stbi_uc* image_slice_data = stbi_load(filename, &image_slice_width, &image_slice_height, &image_slice_channels, STBI_rgb_alpha);
 		assert(image_slice_data);
+		assert(image_slice_width == volume_width);
+		assert(image_slice_height == volume_height);
 
 		memcpy(image_volume_data + (image_slice_size_bytes * i), image_slice_data, image_slice_size_bytes);
 
@@ -607,7 +613,9 @@ int main()
 	sp_texture_handle cloud_detail_texture_handle = sp_texture_create("cloud_detail", { 32, 32, 32, sp_texture_format::r8g8b8a8 });
 	sp_texture_update(cloud_detail_texture_handle, cloud_detail_image_data, 32 * 32 * 32 * 4);
 
-	sp_texture_handle weather_texture_handle = sp_texture_defaults_checkerboard();
+	const void* cloud_weather_image_data = sp_image_load_from_file("textures/cloud_weather.tga");
+	sp_texture_handle cloud_weather_texture_handle = sp_texture_create("cloud_weather", { 512, 512, 1, sp_texture_format::r8g8b8a8 });
+	sp_texture_update(cloud_weather_texture_handle, cloud_weather_image_data, 512 * 512 * 4);
 
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
@@ -908,7 +916,7 @@ int main()
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_detail_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(weather_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cloud_weather_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				// Copy CBV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle )._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -952,12 +960,14 @@ int main()
 			ImGui::Begin("Clouds", &open, window_flags);
 			ImGui::DragFloat("Sampling Scale Bias (Weather)", &clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Sampling Scale Bias (Density)", &clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
-			// ImGui::DragFloat("Scale (Detail)", &clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Sampling Scale Bias (Detail)", &clouds_per_frame_data.detail_sample_scale_bias, 0.01f, -1.0f, 1.0f);
 			// ImGui::DragFloat("Density", &clouds_per_frame_data.density_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Coverage Bias", &clouds_per_frame_data.coverage_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Type Bias", &clouds_per_frame_data.type_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Density Bias (Base)", &clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Density Bias (Detail)", &clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Shape Bias (Base)", &clouds_per_frame_data.shape_base_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Shape Bias (Erosion)", &clouds_per_frame_data.shape_base_erosion_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Detail Bias (Base)", &clouds_per_frame_data.shape_detail_bias, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Detail Bias (Erosion)", &clouds_per_frame_data.shape_detail_erosion_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Absorption", &clouds_per_frame_data.absorption_factor, 0.001f, 0.0f, 1.0f);
 			ImGui::DragFloat("Scattering", &clouds_per_frame_data.scattering_factor, 0.001f, 0.0f, 1.0f);
 			ImGui::DragFloat("Cloud Layer (Begin)", &clouds_per_frame_data.cloud_layer_height_begin);

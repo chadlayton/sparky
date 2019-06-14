@@ -15,7 +15,9 @@ CBUFFER_DECLARE(constant_buffer_clouds_per_frame_data, CBUFFER_CLOUDS_REGISTER)
 	float coverage_bias = 0.0f;
 	float type_bias = 0.0f;
 	float shape_base_bias = 0.0f;
+	float shape_base_erosion_bias = 0.0f;
 	float shape_detail_bias = 0.0f;
+	float shape_detail_erosion_bias = 0.0f;
 	float absorption_factor = 0.01f;
 	float scattering_factor = 0.01f;
 
