@@ -50,8 +50,8 @@ void sp_descriptor_heap_destroy(sp_descriptor_heap* descriptor_heap);
 
 void sp_descriptor_heap_reset(sp_descriptor_heap* descriptor_heap);
 
-void sp_descriptor_heap_advance(sp_descriptor_heap* descriptor_heap, int descriptor_count);
-
 sp_descriptor_handle sp_descriptor_heap_get_head(const sp_descriptor_heap& descriptor_heap);
 
-sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap);
+sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, int descriptor_count = 1);
+
+void sp_descriptor_copy(sp_descriptor_handle dest, sp_descriptor_handle* source, int descriptor_count, sp_descriptor_heap_type heap_type);

@@ -902,6 +902,7 @@ int main()
 				}
 			}
 
+			/*
 			// clouds
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
@@ -923,9 +924,8 @@ int main()
 				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_clouds_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}
+			}*/
 
-			/*
 			// lighting
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
@@ -937,16 +937,29 @@ int main()
 
 				// Copy SRV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				sp_descriptor_copy(
+					sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 4), 
+					std::array<sp_descriptor_handle, 4>{
+						detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view,
+						detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view,
+						detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view,
+						detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view,
+					}.data(),
+					4,
+					sp_descriptor_heap_type::cbv_srv_uav);
+
 				// Copy CBV
 				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-				_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				sp_descriptor_copy(
+					sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 1),
+					std::array<sp_descriptor_handle, 1>{
+						sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view,
+					}.data(),
+					4,
+					sp_descriptor_heap_type::cbv_srv_uav);
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}*/
+			}
 
 			//sp_debug_gui_show_demo_window();
 			bool open = true;
