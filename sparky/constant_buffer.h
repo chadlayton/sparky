@@ -1,11 +1,10 @@
 #pragma once
 
-#include "handle.h"
-#include "descriptor.h"
-
 #include <array>
 
 #include <d3d12.h>
+
+struct sp_descriptor_handle;
 
 struct sp_constant_buffer_heap_desc
 {
@@ -20,21 +19,10 @@ struct sp_constant_buffer_heap
 	int _head;
 };
 
-using sp_constant_buffer_heap_handle = sp_handle;
+sp_constant_buffer_heap sp_constant_buffer_heap_create(const char* name, const sp_constant_buffer_heap_desc& desc);
 
-namespace detail
-{
-	void sp_constant_buffer_heap_pool_create();
-	void sp_constant_buffer_heap_pool_destroy();
-}
+void sp_constant_buffer_heap_reset(sp_constant_buffer_heap* constant_buffer_heap);
 
-sp_constant_buffer_heap_handle sp_constant_buffer_heap_create(const char* name, const sp_constant_buffer_heap_desc& desc);
+void sp_constant_buffer_heap_destroy(sp_constant_buffer_heap* constant_buffer_heap);
 
-void sp_constant_buffer_heap_reset(sp_constant_buffer_heap_handle constant_buffer_heap_handle);
-
-// TODO: Don't expose constant_buffe except by handle
-const sp_constant_buffer_heap& sp_constant_buffer_heap_get_hack(const sp_constant_buffer_heap_handle& constant_buffer_heap_handle);
-
-void sp_constant_buffer_heap_destroy(sp_constant_buffer_heap_handle constant_buffer_heap_handle);
-
-sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap_handle constant_buffer_heap_handle, int size_bytes, const void* initial_data);
+sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_buffer_heap, int size_bytes, const void* initial_data);

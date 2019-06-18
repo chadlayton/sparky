@@ -715,11 +715,10 @@ int main()
 
 	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
 
-	sp_constant_buffer_heap_handle constant_buffer_heap_per_frame_handle = sp_constant_buffer_heap_create("per_frame", { 32 * 1024 });
-	sp_constant_buffer_heap_handle constant_buffer_heap_per_object_handle = sp_constant_buffer_heap_create("per_object", { 128 * 1024 });
+	sp_constant_buffer_heap constant_buffer_heap = sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
 
-	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("main", {});
-	sp_compute_command_list compute_command_list = sp_compute_command_list_create("main", {});
+	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
+	sp_compute_command_list compute_command_list = sp_compute_command_list_create("compute_command_list", {});
 
 	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
 	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
@@ -790,12 +789,12 @@ int main()
 			constant_buffer_per_frame_data.camera_position_ws = camera.position;
 			constant_buffer_per_frame_data.sun_direction_ws = sun_direction_ws;
 
-			constant_buffer_per_frame = sp_constant_buffer_alloc(constant_buffer_heap_per_frame_handle, sizeof(constant_buffer_per_frame_data), &constant_buffer_per_frame_data);
+			constant_buffer_per_frame = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_frame_data), &constant_buffer_per_frame_data);
 		}
 
 		sp_descriptor_handle constant_buffer_per_frame_clouds;
 		{
-			constant_buffer_per_frame_clouds = sp_constant_buffer_alloc(constant_buffer_heap_per_frame_handle, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
+			constant_buffer_per_frame_clouds = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
 		}
 
 		// Record all the commands we need to render the scene into the command list.
@@ -841,7 +840,7 @@ int main()
 						constant_buffer_per_object_data per_object_data;
 						per_object_data.world_matrix = world_matrix;
 
-						constant_buffer_per_object = sp_constant_buffer_alloc(constant_buffer_heap_per_object_handle, sizeof(constant_buffer_per_object_data), &per_object_data);
+						constant_buffer_per_object = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_object_data), &per_object_data);
 					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
@@ -877,7 +876,7 @@ int main()
 						constant_buffer_per_object_data per_object_data;
 						per_object_data.world_matrix = world_matrix;
 
-						constant_buffer_per_object = sp_constant_buffer_alloc(constant_buffer_heap_per_object_handle, sizeof(constant_buffer_per_object_data), &per_object_data);
+						constant_buffer_per_object = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_object_data), &per_object_data);
 					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
@@ -1013,6 +1012,7 @@ int main()
 			sp_compute_command_list_close(compute_command_list);
 
 			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
+			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 		}
 
 		sp_graphics_queue_execute(graphics_command_list);
@@ -1025,8 +1025,7 @@ int main()
 		sp_graphics_command_list_reset(graphics_command_list);
 		sp_compute_command_list_reset(compute_command_list);
 
-		sp_constant_buffer_heap_reset(constant_buffer_heap_per_frame_handle);
-		sp_constant_buffer_heap_reset(constant_buffer_heap_per_object_handle);
+		sp_constant_buffer_heap_reset(&constant_buffer_heap);
 
 		back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 
