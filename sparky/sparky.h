@@ -244,7 +244,7 @@ void sp_init(const sp_window& window)
 	detail::sp_vertex_buffer_pool_create();
 	detail::sp_graphics_pipeline_state_pool_create();
 	detail::sp_compute_pipeline_state_pool_create();
-	detail::sp_constant_buffer_pool_create();
+	detail::sp_constant_buffer_heap_pool_create();
 	detail::sp_pixel_shader_pool_create();
 	detail::sp_vertex_shader_pool_create();
 	detail::sp_compute_shader_pool_create();
@@ -293,7 +293,7 @@ void sp_shutdown()
 	detail::sp_vertex_buffer_pool_destroy();
 	detail::sp_graphics_pipeline_state_pool_destroy();
 	detail::sp_compute_pipeline_state_pool_destroy();
-	detail::sp_constant_buffer_pool_destroy();
+	detail::sp_constant_buffer_heap_pool_destroy();
 	detail::sp_pixel_shader_pool_destroy();
 	detail::sp_vertex_shader_pool_destroy();
 	detail::sp_compute_shader_pool_destroy();

@@ -708,17 +708,15 @@ int main()
 
 	} constant_buffer_per_frame_data;
 
-	__declspec(align(16)) struct
+	__declspec(align(16)) struct constant_buffer_per_object_data
 	{
 		math::mat<4> world_matrix;
-
-	} constant_buffer_per_object_data;
+	};
 
 	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
 
-	sp_constant_buffer_handle constant_buffer_per_frame_handle = sp_constant_buffer_create("per_frame", { sizeof(constant_buffer_per_frame_data) });
-	sp_constant_buffer_handle constant_buffer_per_object_handle = sp_constant_buffer_create("per_object", { sizeof(constant_buffer_per_object_data) });
-	sp_constant_buffer_handle constant_buffer_clouds_per_frame_handle = sp_constant_buffer_create("clouds_per_frame", { sizeof(constant_buffer_clouds_per_frame_data) });
+	sp_constant_buffer_heap_handle constant_buffer_heap_per_frame_handle = sp_constant_buffer_heap_create("per_frame", { 32 * 1024 });
+	sp_constant_buffer_heap_handle constant_buffer_heap_per_object_handle = sp_constant_buffer_heap_create("per_object", { 128 * 1024 });
 
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("main", {});
 	sp_compute_command_list compute_command_list = sp_compute_command_list_create("main", {});
@@ -762,6 +760,7 @@ int main()
 			sun_direction_ws = math::transform_vector(math::create_rotation_x(-0.1f), sun_direction_ws);
 		}
 
+		sp_descriptor_handle constant_buffer_per_frame;
 		{
 #ifdef JITTER_MATRIX
 			const math::vec<2> jitter_sample_pattern[] = {
@@ -791,11 +790,12 @@ int main()
 			constant_buffer_per_frame_data.camera_position_ws = camera.position;
 			constant_buffer_per_frame_data.sun_direction_ws = sun_direction_ws;
 
-			sp_constant_buffer_update(constant_buffer_per_frame_handle, &constant_buffer_per_frame_data, sizeof(constant_buffer_per_frame_data));
+			constant_buffer_per_frame = sp_constant_buffer_alloc(constant_buffer_heap_per_frame_handle, sizeof(constant_buffer_per_frame_data), &constant_buffer_per_frame_data);
 		}
 
+		sp_descriptor_handle constant_buffer_per_frame_clouds;
 		{
-			sp_constant_buffer_update(constant_buffer_clouds_per_frame_handle, &clouds_per_frame_data, sizeof(constant_buffer_clouds_per_frame_data));
+			constant_buffer_per_frame_clouds = sp_constant_buffer_alloc(constant_buffer_heap_per_frame_handle, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
 		}
 
 		// Record all the commands we need to render the scene into the command list.
@@ -834,12 +834,14 @@ int main()
 
 				for (int i = 0; i < scene.meshes.size(); ++i)
 				{
+					sp_descriptor_handle constant_buffer_per_object;
 					{
 						const math::mat<4> world_matrix = math::create_identity<4>();
 
-						constant_buffer_per_object_data.world_matrix = world_matrix;
+						constant_buffer_per_object_data per_object_data;
+						per_object_data.world_matrix = world_matrix;
 
-						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
+						constant_buffer_per_object = sp_constant_buffer_alloc(constant_buffer_heap_per_object_handle, sizeof(constant_buffer_per_object_data), &per_object_data);
 					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
@@ -859,8 +861,8 @@ int main()
 					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(scene.textures[scene.materials[i].metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 					// Copy CBV
 					graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_object_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_frame._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_object._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 					sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &scene.meshes[i].vertex_buffer_handle, 1);
 					sp_graphics_command_list_draw_instanced(graphics_command_list, scene.meshes[i].vertex_count, 1);
@@ -868,13 +870,14 @@ int main()
 
 				for (int i = 0; i < cube.meshes.size(); ++i)
 				{
-					// TODO: If I actually wanted a different transform per object then I need to allocate these out of a ring buffer or something.
+					sp_descriptor_handle constant_buffer_per_object;
 					{
 						const math::mat<4> world_matrix = math::create_identity<4>();
 
-						constant_buffer_per_object_data.world_matrix = world_matrix;
+						constant_buffer_per_object_data per_object_data;
+						per_object_data.world_matrix = world_matrix;
 
-						sp_constant_buffer_update(constant_buffer_per_object_handle, &constant_buffer_per_object_data, sizeof(constant_buffer_per_object_data));
+						constant_buffer_per_object = sp_constant_buffer_alloc(constant_buffer_heap_per_object_handle, sizeof(constant_buffer_per_object_data), &per_object_data);
 					}
 
 					// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
@@ -894,8 +897,8 @@ int main()
 					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[cube.materials[i].metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 					// Copy CBV
 					graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, sp_constant_buffer_get_hack(constant_buffer_per_object_handle)._constant_buffer_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_frame._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_object._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 					sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &cube.meshes[i].vertex_buffer_handle, 1);
 					sp_graphics_command_list_draw_instanced(graphics_command_list, cube.meshes[i].vertex_count, 1);
@@ -953,7 +956,7 @@ int main()
 				sp_descriptor_copy(
 					sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 1),
 					std::array<sp_descriptor_handle, 1>{
-						sp_constant_buffer_get_hack(constant_buffer_per_frame_handle)._constant_buffer_view,
+						constant_buffer_per_frame,
 					}.data(),
 					4,
 					sp_descriptor_heap_type::cbv_srv_uav);
@@ -1021,6 +1024,9 @@ int main()
 
 		sp_graphics_command_list_reset(graphics_command_list);
 		sp_compute_command_list_reset(compute_command_list);
+
+		sp_constant_buffer_heap_reset(constant_buffer_heap_per_frame_handle);
+		sp_constant_buffer_heap_reset(constant_buffer_heap_per_object_handle);
 
 		back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 
