@@ -54,4 +54,4 @@ sp_descriptor_handle sp_descriptor_heap_get_head(const sp_descriptor_heap& descr
 
 sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, int descriptor_count = 1);
 
-void sp_descriptor_copy(sp_descriptor_handle dest, sp_descriptor_handle* source, int descriptor_count, sp_descriptor_heap_type heap_type);
+void sp_descriptor_copy(sp_descriptor_handle dest_descriptor_range_start, sp_descriptor_handle* source_descriptors, int descriptor_count, sp_descriptor_heap_type heap_type);

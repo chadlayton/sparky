@@ -67,7 +67,7 @@ sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, in
 
 	sp_descriptor_handle descriptor_handle = descriptor_heap->_head;
 
-	const SIZE_T offset = descriptor_heap->_descriptor_size * descriptor_count;
+	const SIZE_T offset = static_cast<SIZE_T>(descriptor_heap->_descriptor_size) * descriptor_count;
 
 	descriptor_heap->_head._handle_cpu_d3d12.ptr += offset;
 	descriptor_heap->_head._handle_gpu_d3d12.ptr += offset;
@@ -77,15 +77,27 @@ sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, in
 	return descriptor_handle;
 }
 
-void sp_descriptor_copy(sp_descriptor_handle dest, sp_descriptor_handle* source, int descriptor_count, sp_descriptor_heap_type heap_type)
+void sp_descriptor_copy(sp_descriptor_handle dest_descriptor_range_start, sp_descriptor_handle* source_descriptors, int descriptor_count, sp_descriptor_heap_type heap_type)
 {
 	static const int SP_DESCRIPTOR_COPY_COUNT_MAX = 32;
 
 	assert(descriptor_count < SP_DESCRIPTOR_COPY_COUNT_MAX);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE source_d3d12[SP_DESCRIPTOR_COPY_COUNT_MAX];
+	D3D12_CPU_DESCRIPTOR_HANDLE source_descriptor_handles_cpu_d3d12[SP_DESCRIPTOR_COPY_COUNT_MAX];
+	std::transform(source_descriptors, source_descriptors + descriptor_count, source_descriptor_handles_cpu_d3d12, [](const sp_descriptor_handle& handle) { return handle._handle_cpu_d3d12;  });
 
-	std::transform(source, source + descriptor_count, source_d3d12, [](const sp_descriptor_handle& handle) { return handle._handle_cpu_d3d12;  });
+	// We want to copy from N ranges of 1 descriptor to 1 contiguous range of N descriptors
+	UINT source_descriptor_range_sizes[SP_DESCRIPTOR_COPY_COUNT_MAX];
+	std::fill_n(source_descriptor_range_sizes, descriptor_count, 1);
 
-	_sp._device->CopyDescriptorsSimple(descriptor_count, dest._handle_cpu_d3d12, source_d3d12[0], static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(heap_type));
+	const UINT dest_descriptor_range_count = 1;
+	const UINT dest_descriptor_range_sizes[1] = { static_cast<UINT>(descriptor_count) };
+	_sp._device->CopyDescriptors(
+		1,
+		&dest_descriptor_range_start._handle_cpu_d3d12,
+		dest_descriptor_range_sizes,
+		descriptor_count,
+		source_descriptor_handles_cpu_d3d12,
+		source_descriptor_range_sizes,
+		static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(heap_type));
 }

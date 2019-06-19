@@ -856,17 +856,29 @@ int main()
 					// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
 					// Copy SRV
 					graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(scene.textures[scene.materials[i].base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(scene.textures[scene.materials[i].metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					sp_descriptor_copy(
+						sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 2),
+						std::array<sp_descriptor_handle, 2>{
+							detail::sp_texture_pool_get(scene.textures[scene.materials[i].base_color_texture_index])._shader_resource_view,
+							detail::sp_texture_pool_get(scene.textures[scene.materials[i].metalness_roughness_texture_index])._shader_resource_view,
+						}.data(),
+						2,
+						sp_descriptor_heap_type::cbv_srv_uav);
 					// Copy CBV
 					graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_frame._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_object._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					sp_descriptor_copy(
+						sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 2),
+						std::array<sp_descriptor_handle, 2>{
+							constant_buffer_per_frame,
+							constant_buffer_per_object
+						}.data(),
+						2,
+						sp_descriptor_heap_type::cbv_srv_uav);
 
 					sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &scene.meshes[i].vertex_buffer_handle, 1);
 					sp_graphics_command_list_draw_instanced(graphics_command_list, scene.meshes[i].vertex_count, 1);
 				}
-
+				/*
 				for (int i = 0; i < cube.meshes.size(); ++i)
 				{
 					sp_descriptor_handle constant_buffer_per_object;
@@ -892,16 +904,27 @@ int main()
 					// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
 					// Copy SRV
 					graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[cube.materials[i].base_color_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, detail::sp_texture_pool_get(cube.textures[cube.materials[i].metalness_roughness_texture_index])._shader_resource_view._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					sp_descriptor_copy(
+						sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 2),
+						std::array<sp_descriptor_handle, 2>{
+							detail::sp_texture_pool_get(cube.textures[cube.materials[i].base_color_texture_index])._shader_resource_view,
+							detail::sp_texture_pool_get(cube.textures[cube.materials[i].metalness_roughness_texture_index])._shader_resource_view,
+						}.data(),
+						2,
+						sp_descriptor_heap_type::cbv_srv_uav);
 					// Copy CBV
 					graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_frame._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					_sp._device->CopyDescriptorsSimple(1, sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_cpu_d3d12, constant_buffer_per_object._handle_cpu_d3d12, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
+					sp_descriptor_copy(
+						sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_gpu, 2),
+						std::array<sp_descriptor_handle, 2>{
+							constant_buffer_per_frame,
+							constant_buffer_per_object
+						}.data(),
+						2,
+						sp_descriptor_heap_type::cbv_srv_uav);
 					sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &cube.meshes[i].vertex_buffer_handle, 1);
 					sp_graphics_command_list_draw_instanced(graphics_command_list, cube.meshes[i].vertex_count, 1);
-				}
+				}*/
 			}
 
 			/*
@@ -957,7 +980,7 @@ int main()
 					std::array<sp_descriptor_handle, 1>{
 						constant_buffer_per_frame,
 					}.data(),
-					4,
+					1,
 					sp_descriptor_heap_type::cbv_srv_uav);
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
