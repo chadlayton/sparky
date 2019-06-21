@@ -44,6 +44,11 @@ struct sp_descriptor_heap
 	sp_descriptor_handle _head;
 };
 
+namespace detail
+{
+	sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, int descriptor_count = 1);
+}
+
 sp_descriptor_heap sp_descriptor_heap_create(const char* name, const sp_descriptor_heap_desc& desc);
 
 void sp_descriptor_heap_destroy(sp_descriptor_heap* descriptor_heap);
@@ -52,6 +57,10 @@ void sp_descriptor_heap_reset(sp_descriptor_heap* descriptor_heap);
 
 sp_descriptor_handle sp_descriptor_heap_get_head(const sp_descriptor_heap& descriptor_heap);
 
-sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, int descriptor_count = 1);
+void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const sp_descriptor_handle* source_descriptors, int descriptor_count);
 
-void sp_descriptor_copy(sp_descriptor_handle dest_descriptor_range_start, sp_descriptor_handle* source_descriptors, int descriptor_count, sp_descriptor_heap_type heap_type);
+template <int N>
+void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const sp_descriptor_handle (&source_descriptors)[N])
+{
+	sp_descriptor_copy_to_heap(dest_dscriptor_heap, source_descriptors, N);
+}

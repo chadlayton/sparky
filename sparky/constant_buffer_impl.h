@@ -52,7 +52,7 @@ sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_
 {
 	const int size_bytes_aligned = (size_bytes + 255) & ~255;
 
-	sp_descriptor_handle constant_buffer_view = sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 	D3D12_CONSTANT_BUFFER_VIEW_DESC constant_buffer_view_desc = {};
 	constant_buffer_view_desc.BufferLocation = constant_buffer_heap->_resource->GetGPUVirtualAddress() + constant_buffer_heap->_head;

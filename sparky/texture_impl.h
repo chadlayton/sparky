@@ -179,7 +179,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	// TODO: Including the SRV and RTV in the texture isn't ideal. Need to lookup texture by handle just to
 	// get another handle. The views should be first class types.
 
-	texture._shader_resource_view = sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu);
+	texture._shader_resource_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 	shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -201,7 +201,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	{
 		if (detail::sp_texture_format_is_depth(desc.format))
 		{
-			texture._depth_stencil_view = sp_descriptor_alloc(&_sp._descriptor_heap_dsv_cpu);
+			texture._depth_stencil_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_dsv_cpu);
 
 			D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc_d3d12 = {};
 			depth_stencil_view_desc_d3d12.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
@@ -211,7 +211,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		}
 		else
 		{
-			texture._render_target_view = sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
+			texture._render_target_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
 
 			D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
 			render_target_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
