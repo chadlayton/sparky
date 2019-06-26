@@ -99,8 +99,10 @@ float distribution(float n_dot_h, float alpha)
 * @return The fraction of light reflected (in inverse steradians sr^-1) 
 *         in the direction of V.
 */
-float3 specular(float3 specular_color, float n_dot_v, float n_dot_l, float n_dot_h, float v_dot_h, float l_dot_h, float alpha)
+float3 specular(float3 specular_color, float n_dot_v, float n_dot_l, float n_dot_h, float l_dot_h, float alpha)
 {
+	// Note: l_dot_h = v_dot_h
+
 	// Cook-Torrance BRDF
 	// V = G / (n_dot_l * n_dot_v)
 	// f_s = (F * G * D) / (4 * n_dot_l * n_dot_v) 

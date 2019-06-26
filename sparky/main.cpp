@@ -123,6 +123,7 @@ struct model
 {
 	struct material
 	{
+		char name[128];
 		int base_color_texture_index = -1;
 		int metalness_roughness_texture_index = -1;
 		std::array<float, 4> base_color_factor = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -280,10 +281,8 @@ namespace detail
 	}
 }
 
-model model_create_from_gltf(const char* path, sp_texture_handle base_color_texture_handle, sp_texture_handle metalness_roughness_texture_handle)
+model model_create_from_gltf(const char* path, std::function<void(const char*, model::material*, std::vector<const char*>*)> on_material_created)
 {
-	model model;
-
 	const fx::gltf::ReadQuotas read_quotas_fx = {
 		fx::gltf::detail::DefaultMaxBufferCount,
 		fx::gltf::detail::DefaultMaxMemoryAllocation * 2,
@@ -291,34 +290,24 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 	};
 	fx::gltf::Document doc_fx = fx::gltf::LoadFromText(path, read_quotas_fx);
 
-	model.textures.reserve(doc_fx.textures.size());
+	std::vector<const char*> image_paths;
 
 	for (const auto& texture_fx : doc_fx.textures)
 	{
-		std::vector<uint8_t> image_data;
-
 		const fx::gltf::Image& image_fx = doc_fx.images[texture_fx.source];
 
 		if (!image_fx.uri.empty() && !image_fx.IsEmbeddedResource())
 		{
-			std::string image_path = fx::gltf::detail::GetDocumentRootPath(path) + "/" + image_fx.uri;
-			
-			int image_width, image_height, image_channels;
-			stbi_uc* image_data = stbi_load(image_path.c_str(), &image_width, &image_height, &image_channels, STBI_rgb_alpha);
-			assert(image_data);
-			
-			sp_texture_handle texture_handle = sp_texture_create(image_fx.uri.c_str(), { image_width, image_height, 1, sp_texture_format::r8g8b8a8 });
-			sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
-			
-			stbi_image_free(image_data);
-
-			model.textures.push_back(texture_handle);
+			image_paths.push_back(image_fx.uri.c_str());
 		}
 		else
 		{
 			assert(false);
 		}
 	}
+
+	std::vector<model::material> materials;
+	std::vector<model::mesh> meshes;
 
 	for (const auto& mesh_fx : doc_fx.meshes)
 	{
@@ -446,14 +435,17 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 			{
 				const fx::gltf::Material& material_fx = doc_fx.materials[primitive_gltf.material];
 
+				strcpy(material.name, material_fx.name.c_str());
 				material.base_color_texture_index = material_fx.pbrMetallicRoughness.baseColorTexture.index;
 				material.metalness_roughness_texture_index = material_fx.pbrMetallicRoughness.metallicRoughnessTexture.index;
 				material.base_color_factor = material_fx.pbrMetallicRoughness.baseColorFactor;
 				material.metalness_factor = material_fx.pbrMetallicRoughness.metallicFactor;
 				material.roughness_factor = material_fx.pbrMetallicRoughness.roughnessFactor;
 				material.double_sided = material_fx.doubleSided;
+
+				if (on_material_created) on_material_created(material_fx.name.c_str(), &material, &image_paths);
 			}
-			model.materials.push_back(material);
+			materials.push_back(material);
 
 			model::mesh mesh;
 			{
@@ -461,31 +453,50 @@ model model_create_from_gltf(const char* path, sp_texture_handle base_color_text
 				sp_vertex_buffer_update(mesh.vertex_buffer_handle, vertices.data(), static_cast<int>(vertices.size() * sizeof(vertex)));
 				mesh.vertex_count = static_cast<int>(vertices.size());
 			}
-
-			model.meshes.push_back(mesh);
+			meshes.push_back(mesh);
 		}
 	}
 
-	// Fill in any missing materials with the defaults
-	for (auto& material : model.materials)
+	std::vector<sp_texture_handle> textures(image_paths.size() + 1 /* Plus one because we always add default below */);
+
+	// Load all references
+	for (const auto& image_path : image_paths)
+	{
+		std::string image_path_with_root = fx::gltf::detail::GetDocumentRootPath(path) + "/" + std::string(image_path);
+
+		int image_width, image_height, image_channels;
+		stbi_uc* image_data = stbi_load(image_path_with_root.c_str(), &image_width, &image_height, &image_channels, STBI_rgb_alpha);
+		assert(image_data);
+
+		sp_texture_handle texture_handle = sp_texture_create(image_path, { image_width, image_height, 1, sp_texture_format::r8g8b8a8 });
+		sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
+
+		stbi_image_free(image_data);
+
+		textures.push_back(texture_handle);
+	}
+
+	// Fill in any still missing textures with a default
+	for (auto& material : materials)
 	{
 		if (material.base_color_texture_index < 0)
 		{
-			material.base_color_texture_index = static_cast<int>(model.textures.size());
+			material.base_color_texture_index = static_cast<int>(textures.size());
 		}
-	}
 
-	model.textures.push_back(base_color_texture_handle);
-
-	for (auto& material : model.materials)
-	{
 		if (material.metalness_roughness_texture_index < 0)
 		{
-			material.metalness_roughness_texture_index = static_cast<int>(model.textures.size());
+			material.metalness_roughness_texture_index = static_cast<int>(textures.size());
 		}
 	}
 
-	model.textures.push_back(metalness_roughness_texture_handle);
+	textures.push_back(sp_texture_defaults_white());
+
+	model model;
+
+	model.meshes = std::move(meshes);
+	model.materials = std::move(materials);
+	model.textures = std::move(textures);
 
 	return model;
 }
@@ -685,19 +696,40 @@ int main()
 		},
 		});
 
-	//model scene = model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	//model scene = model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	//model scene = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
-	//model scene = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white());
+	// TODO: Be nicer if I could assign handles to the material. Better if I could not write completely custom callbacks. Maybe some rules like:
+	// material_override.create("MyMaterial").base_color_factor("Name", [](color* value) { value->r = 0; }).metalness(1.0).roughness(mul(3));
+	auto shader_ball_material_loaded_callback = [](const char* material_name, model::material* material, std::vector<const char*>* image_paths)  {
+		if (strcmp(material_name, "Inside") == 0)
+		{
+			material->metalness_factor = 1.0;
+			material->roughness_factor = 1.0f;
+			material->base_color_factor = { 1.0f, 0.0f, 0.0f, 1.0f };
+		}
+		else if (strcmp(material_name, "Outside") == 0)
+		{
+			material->metalness_factor = 1.0;
+			material->roughness_factor = 0.0f;
+			material->base_color_factor = { 0.0f, 1.0f, 0.0f, 1.0f };
+		}
+		else if (strcmp(material_name, "Base") == 0)
+		{
+			material->metalness_factor = 0.0;
+			material->roughness_factor = 1.0f;
+			material->base_color_factor = { 0.0f, 0.0f, 1.0f, 1.0f };
+		}
 
-	//model cube = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white());
+		material->metalness_factor = 1.0;
+		material->roughness_factor = 0.0f;
+		material->base_color_factor = { 1.0f, 0.0f, 0.0f, 1.0f };
+	};
 
-	std::vector<model> models{ 
+	std::vector<std::pair<model, math::mat<4>>> entities{
 		//model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
-		 model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
+		//model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
+		{ model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
 	};
 
 	__declspec(align(16)) struct
@@ -715,11 +747,6 @@ int main()
 		float dummy2;
 
 	} constant_buffer_per_frame_data;
-
-	__declspec(align(16)) struct constant_buffer_per_object_data
-	{
-		math::mat<4> world_matrix;
-	};
 
 	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
 
@@ -839,16 +866,30 @@ int main()
 
 				graphics_command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				for (const model& model : models)
+				for (const std::pair<model, math::mat<4>>& entity : entities)
 				{
+					// C++17
+					// const auto& [model, transform] = entity;
+
+					const model& model = entity.first;
+					const math::mat<4>& transform = entity.second;
+
 					for (int i = 0; i < static_cast<int>(model.meshes.size()); ++i)
 					{
 						sp_descriptor_handle constant_buffer_per_object;
 						{
-							const math::mat<4> world_matrix = math::create_identity<4>();
+							__declspec(align(16)) struct constant_buffer_per_object_data
+							{
+								math::mat<4> world_matrix;
+								math::vec<4> base_color_factor;
+								math::vec<4> metalness_roughness_factor;
+							};
 
-							constant_buffer_per_object_data per_object_data;
-							per_object_data.world_matrix = world_matrix;
+							constant_buffer_per_object_data per_object_data{
+								transform,
+								{ model.materials[i].base_color_factor[0], model.materials[i].base_color_factor[1], model.materials[i].base_color_factor[2], model.materials[i].base_color_factor[3] },
+								{ model.materials[i].metalness_factor, model.materials[i].roughness_factor, 0.0f, 0.0f }
+							};
 
 							constant_buffer_per_object = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_object_data), &per_object_data);
 						}
@@ -952,6 +993,26 @@ int main()
 			//sp_debug_gui_show_demo_window();
 			bool open = true;
 			int window_flags = 0;
+			ImGui::Begin("Materials", &open, window_flags);
+			for (auto& entity : entities)
+			{
+				ImGui::PushID(&entity);
+
+				for (int i = 0; i < entity.first.materials.size(); ++i)
+				{
+					model::material& material = entity.first.materials[i];
+
+					ImGui::PushID(&material);
+					ImGui::CollapsingHeader(material.name);
+					ImGui::ColorEdit3("Base Color", material.base_color_factor.data());
+					ImGui::DragFloat("Metalness", &material.metalness_factor, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Roughness", &material.roughness_factor, 0.01f, 0.0f, 1.0f);
+					ImGui::PopID();
+				}
+				ImGui::PopID();
+			}
+			ImGui::End();
+			/*
 			ImGui::Begin("Camera", &open, window_flags);
 			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
 			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
@@ -985,7 +1046,7 @@ int main()
 			ImGui::DragFloat("Debug1", &clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 100.01f,  0.0f, 10000.0f);
 			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 100.01f,  0.0f, 10000.0f);
-			ImGui::End();
+			ImGui::End();*/
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
 			// since the default imgui implementation expects to be the only one using it.

@@ -101,7 +101,7 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	const float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
 
-	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, projection_matrix, inverse_view_projection_matrix);
+	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, inverse_view_projection_matrix);
 
 	const float3 direction_from_camera_ws = normalize(position_ws - camera_position_ws);
 
@@ -301,7 +301,7 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	// Tonemap and then gamma correct
 	scattering = tonemap(scattering);
-	scattering = srgb_to_linear(scattering);
+	scattering = linear_to_srgb(scattering);
 
 	return float4(background * transmittance + scattering, 1.0);
 }

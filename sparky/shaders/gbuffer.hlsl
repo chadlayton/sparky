@@ -1,4 +1,5 @@
 #include "per_frame_cbuffer.hlsli"
+#include "gamma_correction.hlsli"
 
 #if BINDLESS_TEXTURES
 Texture2D textures_2d[12 /* Must match numDescriptors when creating root signature */] : register(t0, space0);
@@ -12,6 +13,10 @@ SamplerState default_sampler : register(s0);
 cbuffer per_object_cbuffer : register(b1)
 {
 	float4x4 world_matrix;
+
+	// TODO: Move to per_draw_cbuffer
+	float4 base_color_factor;
+	float4 metalness_roughness_factor;
 }
 
 struct vs_input
@@ -67,12 +72,15 @@ ps_output ps_main(ps_input input)
 	// TODO: If we were really using bindless then we'd want to pass the texture index
 	// in a constant buffer instead (since all textures would share the same array). 
 	// e.g. textures_2d[per_object_cbuffer.base_color_texture_index].Sample(...);
-	output.base_color = textures_2d[0].Sample(default_sampler, input.texcoord) * input.color;
-	output.metalness_roughness = textures_2d[1].Sample(default_sampler, input.texcoord);
+	output.base_color = srgb_to_linear(textures_2d[0].Sample(default_sampler, input.texcoord)) * input.color;
+	output.metalness_roughness = textures_2d[1].Sample(default_sampler, input.texcoord).bgra;
 #else
-	output.base_color = base_color_texture.Sample(default_sampler, input.texcoord) * input.color;
-	output.metalness_roughness = metalness_roughness_texture.Sample(default_sampler, input.texcoord);
+	output.base_color = srgb_to_linear(base_color_texture.Sample(default_sampler, input.texcoord)) * input.color;
+	output.metalness_roughness = metalness_roughness_texture.Sample(default_sampler, input.texcoord).bgra;
 #endif
+
+	output.base_color *= base_color_factor;
+	output.metalness_roughness *= metalness_roughness_factor;
 
 	output.normal_ws = float4((normalize(input.normal_ws) + 1) / 2, 1.0);
 
