@@ -74,16 +74,12 @@ namespace detail
 
 void sp_init(const sp_window& window)
 {
-
-#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
-	detail::sp_renderdoc_init();
-#endif
-
 	HRESULT hr = S_FALSE;
 
 	UINT dxgi_factory_flags = 0;
 
 #if _DEBUG
+	// https://docs.microsoft.com/en-us/windows/desktop/api/d3d12sdklayers/
 	{
 		Microsoft::WRL::ComPtr<ID3D12Debug> debug_interface;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug_interface))))
@@ -129,6 +125,46 @@ void sp_init(const sp_window& window)
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 	hr = D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
 	assert(SUCCEEDED(hr));
+
+#if _DEBUG
+	{
+		Microsoft::WRL::ComPtr<ID3D12InfoQueue> info_queue;
+		if (SUCCEEDED(device.As(&info_queue)))
+		{
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+
+			D3D12_MESSAGE_SEVERITY severities[] =
+			{
+				D3D12_MESSAGE_SEVERITY_INFO
+			};
+
+			D3D12_MESSAGE_ID messages[] = 
+			{ 
+				D3D12_MESSAGE_ID_CREATEINPUTLAYOUT_EMPTY_LAYOUT, // We sometimes use an empty layout and generate vertex attributes using SV_VertexID
+				D3D12_MESSAGE_ID_COPY_DESCRIPTORS_INVALID_RANGES // TODO: There's a bug in the D3D12 debug layer that causes this to be triggered incorrectly
+			};
+			D3D12_INFO_QUEUE_FILTER filter = {};
+			filter.DenyList.pIDList = messages;
+			filter.DenyList.NumIDs = static_cast<UINT>(std::size(messages));
+			filter.DenyList.pSeverityList = severities;
+			filter.DenyList.NumSeverities = static_cast<UINT>(std::size(severities));
+			info_queue->PushStorageFilter(&filter);
+			info_queue->PushRetrievalFilter(&filter);
+			//info_queue->AddRetrievalFilterEntries(&filter);
+			//info_queue->AddStorageFilterEntries(&filter);
+		}
+		else
+		{
+			assert(false);
+		}
+	}
+#endif
+
+#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
+	detail::sp_renderdoc_init();
+#endif
 
 	// Describe and create the command queue for graphics command lists
 	D3D12_COMMAND_QUEUE_DESC graphics_queue_desc = {};

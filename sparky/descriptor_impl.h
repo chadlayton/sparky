@@ -86,23 +86,37 @@ void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const s
 
 	assert(descriptor_count < SP_DESCRIPTOR_COPY_COUNT_MAX);
 
-	sp_descriptor_handle dest_descriptor_range_start = detail::sp_descriptor_alloc(dest_dscriptor_heap, descriptor_count);
+	// Our source descriptors are not expected to be congiguous in memory as required by 
+	// CopyDescriptorsSimple. To get the desired behavior we use the full CopyDescriptors
+	// function to copy from N ranges of 1 descriptor to 1 contiguous range of N descriptors
 
-	D3D12_CPU_DESCRIPTOR_HANDLE source_descriptor_handles_cpu_d3d12[SP_DESCRIPTOR_COPY_COUNT_MAX];
-	std::transform(source_descriptors, source_descriptors + descriptor_count, source_descriptor_handles_cpu_d3d12, [](const sp_descriptor_handle& handle) { return handle._handle_cpu_d3d12;  });
-
-	// We want to copy from N ranges of 1 descriptor to 1 contiguous range of N descriptors
+	D3D12_CPU_DESCRIPTOR_HANDLE source_descriptor_range_starts[SP_DESCRIPTOR_COPY_COUNT_MAX];
+	std::transform(source_descriptors, source_descriptors + descriptor_count, source_descriptor_range_starts, [](const sp_descriptor_handle& handle) { return handle._handle_cpu_d3d12;  });
 	UINT source_descriptor_range_sizes[SP_DESCRIPTOR_COPY_COUNT_MAX];
 	std::fill_n(source_descriptor_range_sizes, descriptor_count, 1);
 
-	const UINT dest_descriptor_range_count = 1;
+	D3D12_CPU_DESCRIPTOR_HANDLE dest_descriptor_range_starts[1] = { detail::sp_descriptor_alloc(dest_dscriptor_heap, descriptor_count)._handle_cpu_d3d12 };
 	const UINT dest_descriptor_range_sizes[1] = { static_cast<UINT>(descriptor_count) };
+	const UINT dest_descriptor_range_count = 1;
+
+#if _DEBUG
+	// TODO: Since we're filtering D3D12_MESSAGE_ID_COPY_DESCRIPTORS_INVALID_RANGES due to a bug 
+	// in the D3D12 debug layer, let's check for bad ranges ourselves.
+	for (int i = 0; i < descriptor_count; ++i)
+	{
+		for (int j = 0; j < descriptor_count; ++j)
+		{
+			assert(source_descriptor_range_starts[i].ptr != source_descriptor_range_starts[j].ptr);
+		}
+	}
+#endif
+
 	_sp._device->CopyDescriptors(
-		1,
-		&dest_descriptor_range_start._handle_cpu_d3d12,
+		dest_descriptor_range_count,
+		dest_descriptor_range_starts,
 		dest_descriptor_range_sizes,
 		descriptor_count,
-		source_descriptor_handles_cpu_d3d12,
+		source_descriptor_range_starts,
 		source_descriptor_range_sizes,
 		dest_dscriptor_heap->_heap_d3d12->GetDesc().Type);
 }
