@@ -63,11 +63,7 @@ namespace detail
 			pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
 			int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&renderdoc);
 			assert(ret == 1);
-#if defined(_DEBUG)
-			renderdoc->SetCaptureOptionU32(eRENDERDOC_Option_APIValidation, 1);
-#endif
-			renderdoc->SetCaptureOptionU32(eRENDERDOC_Option_DebugOutputMute, 0);
-	}
+		}
 	}
 #endif
 }
@@ -78,7 +74,7 @@ void sp_init(const sp_window& window)
 
 	UINT dxgi_factory_flags = 0;
 
-#if _DEBUG
+#if SP_DEBUG_API_VALIDATION_LEVEL
 	// https://docs.microsoft.com/en-us/windows/desktop/api/d3d12sdklayers/
 	{
 		Microsoft::WRL::ComPtr<ID3D12Debug> debug_interface;
@@ -90,7 +86,10 @@ void sp_init(const sp_window& window)
 			if (SUCCEEDED(debug_interface.As(&debug_interface1)))
 			{
 				debug_interface1->EnableDebugLayer();
+
+#if SP_DEBUG_API_VALIDATION_LEVEL > 1
 				debug_interface1->SetEnableGPUBasedValidation(true);
+#endif
 			}
 		}
 		else
@@ -126,7 +125,7 @@ void sp_init(const sp_window& window)
 	hr = D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
 	assert(SUCCEEDED(hr));
 
-#if _DEBUG
+#if SP_DEBUG_API_VALIDATION_LEVEL
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue> info_queue;
 		if (SUCCEEDED(device.As(&info_queue)))
@@ -345,12 +344,12 @@ void sp_shutdown()
 	_sp._graphics_queue.Reset();
 	_sp._root_signature.Reset();
 
-#if _DEBUG
+#if SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED
 	{
-		Microsoft::WRL::ComPtr<ID3D12DebugDevice> debug_device_interface;
-		if (SUCCEEDED(_sp._device->QueryInterface(IID_PPV_ARGS(&debug_device_interface))))
+		Microsoft::WRL::ComPtr<ID3D12DebugDevice> debug_device;
+		if (SUCCEEDED(_sp._device.As(&debug_device)))
 		{
-			debug_device_interface->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+			debug_device->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
 		}
 	}
 #endif

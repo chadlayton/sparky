@@ -15,6 +15,7 @@ struct sp_window
 typedef void(*sp_window_event_key_press_cb)(void* user_data, char key);
 typedef void(*sp_window_event_mouse_move_cb)(void* user_data, int x, int y);
 typedef void(*sp_window_event_resize_cb)(void* user_data, int width, int height);
+typedef void(*sp_window_event_char_cb)(void* user_data, char key);
 
 namespace detail
 {
@@ -28,6 +29,8 @@ namespace detail
 		void* on_mouse_move_user_data = nullptr;
 		sp_window_event_resize_cb on_resize = nullptr;
 		void* on_resize_user_data = nullptr;
+		sp_window_event_char_cb on_char = nullptr;
+		void* on_char_user_data = nullptr;
 	};
 
 	sp_window_event_callbacks* sp_window_get_event_callbacks()
@@ -47,6 +50,12 @@ void sp_window_event_set_key_up_callback(sp_window_event_key_press_cb on_key_up,
 {
 	detail::sp_window_get_event_callbacks()->on_key_up = on_key_up;
 	detail::sp_window_get_event_callbacks()->on_key_up_user_data = user_data;
+}
+
+void sp_window_event_set_char_callback(sp_window_event_char_cb on_char, void* user_data)
+{
+	detail::sp_window_get_event_callbacks()->on_char = on_char;
+	detail::sp_window_get_event_callbacks()->on_char_user_data = user_data;
 }
 
 void sp_window_event_set_mouse_move_callback(sp_window_event_mouse_move_cb on_mouse_move, void* user_data)
@@ -91,6 +100,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (callbacks->on_key_up)
 		{
 			(*callbacks->on_key_up)(callbacks->on_key_up_user_data, static_cast<char>(wParam));
+			return 0;
+		}
+		break;
+	}
+	case WM_CHAR:
+	{
+		const detail::sp_window_event_callbacks* callbacks = detail::sp_window_get_event_callbacks();
+		if (callbacks->on_char)
+		{
+			(*callbacks->on_char)(callbacks->on_char, static_cast<char>(wParam));
 			return 0;
 		}
 		break;

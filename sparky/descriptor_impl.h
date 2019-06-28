@@ -106,7 +106,7 @@ void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const s
 	{
 		for (int j = 0; j < descriptor_count; ++j)
 		{
-			assert(source_descriptor_range_starts[i].ptr != source_descriptor_range_starts[j].ptr);
+			assert(source_descriptor_range_starts[i].ptr != dest_descriptor_range_starts[j].ptr);
 		}
 	}
 #endif

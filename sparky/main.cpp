@@ -1,5 +1,7 @@
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
 #define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
+#define SP_DEBUG_API_VALIDATION_LEVEL 1
+#define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 
 #include "handle.h"
 #include "window.h"
@@ -585,6 +587,7 @@ int main()
 			if (key == WM_RBUTTONDOWN) button = 1;
 			if (key == WM_MBUTTONDOWN) button = 2;
 			ImGui::GetIO().MouseDown[button] = true;
+			ImGui::GetIO().KeysDown[key] = true;
 		},
 		&input.current);
 
@@ -598,6 +601,7 @@ int main()
 			if (key == WM_RBUTTONUP) button = 1;
 			if (key == WM_MBUTTONUP) button = 2;
 			ImGui::GetIO().MouseDown[button] = false;
+			ImGui::GetIO().KeysDown[key] = false;
 		},
 		&input.current);
 
@@ -608,6 +612,25 @@ int main()
 			static_cast<input::state*>(user_data)->mouse.y = y;
 		},
 		&input.current);
+
+	sp_window_event_set_char_callback(
+		[](void* user_data, char key) {
+			if (ImGui::GetCurrentContext())
+			{
+				ImGui::GetIO().AddInputCharacter(key);
+			}
+		},
+		nullptr);
+
+	sp_window_event_set_resize_callback(
+		[](void* user_data, int width, int height) {
+			if (ImGui::GetCurrentContext())
+			{
+				ImGui::GetIO().DisplaySize = ImVec2(width, height);
+			}
+		},
+		nullptr
+	);
 
 	sp_window window = sp_window_create("demo", { window_width, window_height });
 
@@ -928,7 +951,6 @@ int main()
 				}
 			}
 
-			/*
 			// clouds
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
@@ -957,8 +979,9 @@ int main()
 						constant_buffer_per_frame_clouds,
 					});
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}*/
+			}
 			
+			/*
 			// lighting
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
@@ -988,7 +1011,7 @@ int main()
 					});
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}
+			}*/
 
 			//sp_debug_gui_show_demo_window();
 			bool open = true;
@@ -1012,12 +1035,13 @@ int main()
 				ImGui::PopID();
 			}
 			ImGui::End();
-			/*
+			
 			ImGui::Begin("Camera", &open, window_flags);
 			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
 			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
 			// TODO: Something is not right here e.g. <0,-1,0> is up
 			ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
+
 			ImGui::End();
 			ImGui::Begin("Clouds", &open, window_flags);
 			ImGui::DragFloat("Sampling Scale Bias (Weather)", &clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
@@ -1046,7 +1070,7 @@ int main()
 			ImGui::DragFloat("Debug1", &clouds_per_frame_data.debug1, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 100.01f,  0.0f, 10000.0f);
 			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 100.01f,  0.0f, 10000.0f);
-			ImGui::End();*/
+			ImGui::End();
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
 			// since the default imgui implementation expects to be the only one using it.
