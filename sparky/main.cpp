@@ -626,7 +626,7 @@ int main()
 		[](void* user_data, int width, int height) {
 			if (ImGui::GetCurrentContext())
 			{
-				ImGui::GetIO().DisplaySize = ImVec2(width, height);
+				ImGui::GetIO().DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
 			}
 		},
 		nullptr
@@ -665,9 +665,9 @@ int main()
 			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT }
 		},
 		{
-			sp_texture_format::r8g8b8a8,
-			sp_texture_format::r8g8b8a8,
-			sp_texture_format::r8g8b8a8,
+			sp_texture_format::r10g10b10a2,
+			sp_texture_format::r10g10b10a2,
+			sp_texture_format::r10g10b10a2,
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::back,
@@ -683,9 +683,9 @@ int main()
 			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT }
 		},
 		{
-			sp_texture_format::r8g8b8a8,
-			sp_texture_format::r8g8b8a8,
-			sp_texture_format::r8g8b8a8,
+			sp_texture_format::r10g10b10a2,
+			sp_texture_format::r10g10b10a2,
+			sp_texture_format::r10g10b10a2,
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::none,
@@ -703,7 +703,7 @@ int main()
 		clouds_pixel_shader_handle,
 		{},
 		{
-			sp_texture_format::r8g8b8a8,
+			sp_texture_format::r10g10b10a2,
 		},
 		});
 
@@ -715,7 +715,7 @@ int main()
 		lighting_pixel_shader_handle,
 		{},
 		{
-			sp_texture_format::r8g8b8a8,
+			sp_texture_format::r10g10b10a2,
 		},
 		});
 
@@ -778,10 +778,10 @@ int main()
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
 	sp_compute_command_list compute_command_list = sp_compute_command_list_create("compute_command_list", {});
 
-	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
-	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
-	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, 1, sp_texture_format::r8g8b8a8 });
-	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d32 });
+	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, 1, sp_texture_format::r10g10b10a2 });
+	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, 1, sp_texture_format::r10g10b10a2 });
+	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, 1, sp_texture_format::r10g10b10a2 });
+	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d16 });
 
 	sp_render_pass_desc gbuffer_render_pass_desc = {
 		{
@@ -951,6 +951,7 @@ int main()
 				}
 			}
 
+			/*
 			// clouds
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
@@ -979,9 +980,8 @@ int main()
 						constant_buffer_per_frame_clouds,
 					});
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}
+			}*/
 			
-			/*
 			// lighting
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
@@ -1011,7 +1011,7 @@ int main()
 					});
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}*/
+			}
 
 			//sp_debug_gui_show_demo_window();
 			bool open = true;

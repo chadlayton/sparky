@@ -75,7 +75,7 @@ float4 ps_main(ps_input input) : SV_Target0
 	const float2 metalness_roughness = gbuffer_metalness_roughness_texture.Sample(default_sampler, input.texcoord).rg;
 	const float metalness = metalness_roughness.r;
 	const float disney_roughness = max(metalness_roughness.g * metalness_roughness.g, 0.003);
-	const float3 normal_ws = gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1;
+	const float3 normal_ws = normalize(gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1);
 
 	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, inverse_view_projection_matrix);
 	const float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws.xyz);

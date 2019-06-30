@@ -22,7 +22,7 @@ namespace detail
 		ImGui::CreateContext();
 
 		ImGui_ImplWin32_Init(window._handle);
-		ImGui_ImplDX12_Init(device, 2, DXGI_FORMAT_R8G8B8A8_UNORM, font_descriptor_handle._handle_cpu_d3d12, font_descriptor_handle._handle_gpu_d3d12);
+		ImGui_ImplDX12_Init(device, 2, DXGI_FORMAT_R10G10B10A2_UNORM, font_descriptor_handle._handle_cpu_d3d12, font_descriptor_handle._handle_gpu_d3d12);
 	}
 
 	void sp_debug_gui_shutdown()

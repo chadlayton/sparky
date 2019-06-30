@@ -99,6 +99,10 @@ void sp_init(const sp_window& window)
 	}
 #endif
 
+#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
+	detail::sp_renderdoc_init();
+#endif
+
 	// Obtain the DXGI factory
 	Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory;
 	hr = CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&dxgi_factory));
@@ -161,10 +165,6 @@ void sp_init(const sp_window& window)
 	}
 #endif
 
-#if SP_DEBUG_RENDERDOC_HOOK_ENABLED
-	detail::sp_renderdoc_init();
-#endif
-
 	// Describe and create the command queue for graphics command lists
 	D3D12_COMMAND_QUEUE_DESC graphics_queue_desc = {};
 	graphics_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -183,7 +183,7 @@ void sp_init(const sp_window& window)
 		swap_chain_desc.BufferCount = k_back_buffer_count;
 		swap_chain_desc.Width = window_client_rect.right;
 		swap_chain_desc.Height = window_client_rect.bottom;
-		swap_chain_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swap_chain_desc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
 		swap_chain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		swap_chain_desc.SampleDesc.Count = 1;
