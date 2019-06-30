@@ -273,9 +273,9 @@ void sp_init(const sp_window& window)
 
 	_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
 	_sp._descriptor_heap_rtv_cpu = sp_descriptor_heap_create("rtv_cpu", { 128, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::rtv });
-	_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 2048, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
+	_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 4096, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
 	_sp._descriptor_heap_cbv_srv_uav_cpu_transient = sp_descriptor_heap_create("cbv_srv_uav_cpu_transient", { 2048, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
-	_sp._descriptor_heap_cbv_srv_uav_gpu = sp_descriptor_heap_create("cbv_srv_uav_gpu", { 1024, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
+	_sp._descriptor_heap_cbv_srv_uav_gpu = sp_descriptor_heap_create("cbv_srv_uav_gpu", { 2048, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
 
 	detail::sp_texture_pool_create();
 	detail::sp_vertex_buffer_pool_create();

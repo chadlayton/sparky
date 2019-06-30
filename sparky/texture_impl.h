@@ -8,7 +8,7 @@ namespace detail
 {
 	namespace resource_pools
 	{
-		std::array<sp_texture, 1024> textures;
+		std::array<sp_texture, 4096> textures;
 		sp_handle_pool texture_handles;
 	}
 

@@ -459,7 +459,8 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 		}
 	}
 
-	std::vector<sp_texture_handle> textures(image_paths.size() + 1 /* Plus one because we always add default below */);
+	std::vector<sp_texture_handle> textures;
+	textures.reserve(image_paths.size() + 1 /* Plus one because we always add default below */);
 
 	// Load all references
 	for (const auto& image_path : image_paths)
@@ -747,12 +748,12 @@ int main()
 	};
 
 	std::vector<std::pair<model, math::mat<4>>> entities{
-		//model_create_from_gltf("models/littlest_tokyo/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
+		{ model_create_from_gltf("models/littlest_tokyo/scene.gltf", nullptr), math::create_rotation_x(-math::pi_div_2) },
 		//model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
-		{ model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
+		//{ model_create_from_gltf("shader_ball", "models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
 	};
 
 	__declspec(align(16)) struct
@@ -781,7 +782,7 @@ int main()
 	sp_texture_handle gbuffer_base_color_texture_handle = sp_texture_create("gbuffer_base_color", { window_width, window_height, 1, sp_texture_format::r10g10b10a2 });
 	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, 1, sp_texture_format::r10g10b10a2 });
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, 1, sp_texture_format::r10g10b10a2 });
-	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d16 });
+	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d32 });
 
 	sp_render_pass_desc gbuffer_render_pass_desc = {
 		{
