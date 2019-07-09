@@ -14,6 +14,7 @@ enum class sp_texture_format
 	r8g8b8a8,
 	r10g10b10a2,
 	r16g16b16a16,
+	r32g32b32a32,
 	d16,
 	d32,
 	unknown,
@@ -67,6 +68,7 @@ namespace detail
 		case sp_texture_format::r8g8b8a8:     return false;
 		case sp_texture_format::r10g10b10a2:  return false;
 		case sp_texture_format::r16g16b16a16: return false;
+		case sp_texture_format::r32g32b32a32: return false;
 		case sp_texture_format::d16:          return true;
 		case sp_texture_format::d32:          return true;
 		};
@@ -83,6 +85,7 @@ namespace detail
 		case sp_texture_format::r8g8b8a8:     return DXGI_FORMAT_R8G8B8A8_TYPELESS;
 		case sp_texture_format::r10g10b10a2:  return DXGI_FORMAT_R10G10B10A2_TYPELESS;
 		case sp_texture_format::r16g16b16a16: return DXGI_FORMAT_R16G16B16A16_TYPELESS;
+		case sp_texture_format::r32g32b32a32: return DXGI_FORMAT_R32G32B32A32_TYPELESS;
 		case sp_texture_format::d16:          return DXGI_FORMAT_R16_TYPELESS;
 		case sp_texture_format::d32:          return DXGI_FORMAT_R32_TYPELESS;
 		};
@@ -99,6 +102,7 @@ namespace detail
 		case sp_texture_format::r8g8b8a8:     return DXGI_FORMAT_R8G8B8A8_UNORM;
 		case sp_texture_format::r10g10b10a2:  return DXGI_FORMAT_R10G10B10A2_UNORM;
 		case sp_texture_format::r16g16b16a16: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+		case sp_texture_format::r32g32b32a32: return DXGI_FORMAT_R32G32B32A32_FLOAT;
 		case sp_texture_format::d16:          return DXGI_FORMAT_R16_UNORM;
 		case sp_texture_format::d32:          return DXGI_FORMAT_R32_FLOAT;
 		};
@@ -124,7 +128,7 @@ namespace detail
 
 sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& desc);
 void sp_texture_destroy(sp_texture_handle texture_handle);
-void sp_texture_update(const sp_texture_handle& texture_handle, const void* data_cpu, int size_bytes);
+void sp_texture_update(const sp_texture_handle& texture_handle, const void* data_cpu, int size_bytes, int pixel_size_bytes);
 
 sp_texture_handle sp_texture_defaults_white();
 sp_texture_handle sp_texture_defaults_black();

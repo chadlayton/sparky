@@ -472,7 +472,7 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 		assert(image_data);
 
 		sp_texture_handle texture_handle = sp_texture_create(image_path, { image_width, image_height, 1, sp_texture_format::r8g8b8a8 });
-		sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha);
+		sp_texture_update(texture_handle, image_data, image_width * image_height * STBI_rgb_alpha, 4);
 
 		stbi_image_free(image_data);
 
@@ -528,7 +528,7 @@ struct sp_render_pass_desc
 	sp_graphics_command_list_set_pipeline_state(handle);
 */
 
-void* sp_image_load_from_file(const char* filename)
+void* sp_image_create_from_file(const char* filename)
 {
 	int image_width, image_height, image_channels;
 	stbi_uc* image_data = stbi_load(filename, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
@@ -537,7 +537,16 @@ void* sp_image_load_from_file(const char* filename)
 	return image_data;
 }
 
-void* sp_image_volume_load_from_directory(const char* dirname, const char* format, int size)
+void* sp_image_create_from_file_hdr(const char* filename)
+{
+	int image_width, image_height, image_channels;
+	float* image_data = stbi_loadf(filename, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
+	assert(image_data);
+
+	return image_data;
+}
+
+void* sp_image_volume_create_from_directory(const char* dirname, const char* format, int size)
 {
 	const int volume_width = size;
 	const int volume_height = size;
@@ -640,17 +649,24 @@ int main()
 	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
 
-	const void* cloud_shape_image_data = sp_image_volume_load_from_directory("textures/cloud_shape", "cloud_shape.%d.tga", 128);
+	const void* cloud_shape_image_data = sp_image_volume_create_from_directory("textures/cloud_shape", "cloud_shape.%d.tga", 128);
 	sp_texture_handle cloud_shape_texture_handle = sp_texture_create("cloud_shape", { 128, 128, 128, sp_texture_format::r8g8b8a8 });
-	sp_texture_update(cloud_shape_texture_handle, cloud_shape_image_data, 128 * 128 * 128 * 4);
+	sp_texture_update(cloud_shape_texture_handle, cloud_shape_image_data, 128 * 128 * 128 * 4, 4);
 
-	const void* cloud_detail_image_data = sp_image_volume_load_from_directory("textures/cloud_detail", "cloud_detail.%d.tga", 32);
+	const void* cloud_detail_image_data = sp_image_volume_create_from_directory("textures/cloud_detail", "cloud_detail.%d.tga", 32);
 	sp_texture_handle cloud_detail_texture_handle = sp_texture_create("cloud_detail", { 32, 32, 32, sp_texture_format::r8g8b8a8 });
-	sp_texture_update(cloud_detail_texture_handle, cloud_detail_image_data, 32 * 32 * 32 * 4);
+	sp_texture_update(cloud_detail_texture_handle, cloud_detail_image_data, 32 * 32 * 32 * 4, 4);
 
-	const void* cloud_weather_image_data = sp_image_load_from_file("textures/cloud_weather.tga");
+	const void* cloud_weather_image_data = sp_image_create_from_file("textures/cloud_weather.tga");
 	sp_texture_handle cloud_weather_texture_handle = sp_texture_create("cloud_weather", { 512, 512, 1, sp_texture_format::r8g8b8a8 });
-	sp_texture_update(cloud_weather_texture_handle, cloud_weather_image_data, 512 * 512 * 4);
+	sp_texture_update(cloud_weather_texture_handle, cloud_weather_image_data, 512 * 512 * 4, 4);
+
+	const void* environment_diffuse_image_data = sp_image_create_from_file_hdr("environments/Factory_Catwalk/Factory_Catwalk_Env.hdr");
+	sp_texture_handle environment_diffuse_texture = sp_texture_create("environment_diffuse", { 512, 256, 1, sp_texture_format::r32g32b32a32 });
+
+	const void* environment_specular_image_data = sp_image_create_from_file_hdr("environments/Factory_Catwalk/Factory_Catwalk_2k.hdr");
+	sp_texture_handle environment_specular_texture = sp_texture_create("environment_specular", { 2048, 1024, 1, sp_texture_format::r32g32b32a32 });
+	sp_texture_update(environment_specular_texture, environment_specular_image_data, 2048 * 1024 * 4 * 4, 4 * 4);
 
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
@@ -748,12 +764,12 @@ int main()
 	};
 
 	std::vector<std::pair<model, math::mat<4>>> entities{
-		{ model_create_from_gltf("models/littlest_tokyo/scene.gltf", nullptr), math::create_rotation_x(-math::pi_div_2) },
-		//model_create_from_gltf("models/smashy_craft_city/scene.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
+		//{ model_create_from_gltf("models/littlest_tokyo/scene.gltf", nullptr), math::create_rotation_x(-math::pi_div_2) },
+		//{ model_create_from_gltf("models/smashy_craft_city/scene.gltf", nullptr), math::create_rotation_x(0) },
 		//model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
 		//model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
-		//{ model_create_from_gltf("shader_ball", "models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
+		{ model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
 	};
 
 	__declspec(align(16)) struct
@@ -1001,6 +1017,7 @@ int main()
 						detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view,
 						detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view,
 						detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view,
+						detail::sp_texture_pool_get(environment_specular_texture)._shader_resource_view,
 					});
 
 				// Copy CBV

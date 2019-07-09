@@ -52,7 +52,7 @@ namespace detail
 		};
 
 		defaults::white = sp_texture_create("default_white", { 2, 2, 1, sp_texture_format::r8g8b8a8 });
-		sp_texture_update(defaults::white, image_data_white, 2 * 2 * 4);
+		sp_texture_update(defaults::white, image_data_white, 2 * 2 * 4, 4);
 
 		constexpr uint8_t image_data_black[] = {
 			0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF,
@@ -60,7 +60,7 @@ namespace detail
 		};
 
 		defaults::black = sp_texture_create("default_black", { 2, 2, 1, sp_texture_format::r8g8b8a8 });
-		sp_texture_update(defaults::black, image_data_black, 2 * 2 * 4);
+		sp_texture_update(defaults::black, image_data_black, 2 * 2 * 4, 4);
 
 		constexpr uint8_t image_data_checkerboard[] = {
 			0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 
@@ -98,7 +98,7 @@ namespace detail
 		};
 
 		defaults::checkerboard = sp_texture_create("default_checkerboard", { 8, 8, 1, sp_texture_format::r8g8b8a8 });
-		sp_texture_update(defaults::checkerboard, image_data_checkerboard, 8 * 8 * 4);
+		sp_texture_update(defaults::checkerboard, image_data_checkerboard, 8 * 8 * 4, 4);
 	}
 
 	void sp_texture_defaults_destroy()
@@ -232,7 +232,7 @@ void sp_texture_destroy(sp_texture_handle texture_handle)
 	sp_handle_free(&detail::resource_pools::texture_handles, texture_handle);
 }
 
-void sp_texture_update(const sp_texture_handle& texture_handle, const void* data_cpu, int size_bytes)
+void sp_texture_update(const sp_texture_handle& texture_handle, const void* data_cpu, int size_bytes, int pixel_size_bytes)
 {
 	sp_texture& texture = detail::resource_pools::textures[texture_handle.index];
 
@@ -265,7 +265,7 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 	// from the upload heap to the Texture2D.
 	D3D12_SUBRESOURCE_DATA subresource_data = {};
 	subresource_data.pData = data_cpu;
-	subresource_data.RowPitch = texture._width * g_pixel_size_bytes;
+	subresource_data.RowPitch = texture._width * pixel_size_bytes;
 	subresource_data.SlicePitch = subresource_data.RowPitch * texture._height;
 
 	assert(size_bytes == subresource_data.SlicePitch * texture._depth);
