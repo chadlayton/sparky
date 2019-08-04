@@ -3,6 +3,7 @@
 #include "position_from_depth.hlsli"
 #include "tonemap.hlsli"
 #include "gamma_correction.hlsli"
+#include "lighting.cbuffer.hlsli"
 
 Texture2D gbuffer_base_color_texture : register(t0);
 Texture2D gbuffer_metalness_roughness_texture : register(t1);
@@ -72,6 +73,18 @@ float3 importance_sample_ggx(float2 Xi, float alpha)
 	return float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta); 
 }
 
+float3 uniform_sample(float2 Xi)
+{
+	const float theta = 2.0 * PI * Xi.x;
+	const float phi = acos(1.0 - 2.0 * Xi.y);
+
+	const float x = sin(phi) * cos(theta);
+	const float y = sin(phi) * sin(theta);
+	const float z = cos(phi);
+
+	return float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
+}
+
 float3x3 orthonormal_basis(float3 n)
 {
 	float3 up = abs(n.z) < (1 - EPSILON) ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
@@ -92,6 +105,16 @@ float2 hammersley(uint i, uint N)
 	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
 	bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
 	return float2(float(i) / float(N), float(bits) * 2.3283064365386963e-10);
+}
+
+float2 spherical_map(float3 direction_ws)
+{
+	// spherical mapping a.k.a equirectangular a.k.a latlong
+	float phi = atan2(direction_ws.z, direction_ws.x);
+	float theta = acos(direction_ws.y);
+	float2 texcoord = float2(phi / (PI * 2), theta / PI);
+
+	return texcoord;
 }
 
 float4 ps_main(ps_input input) : SV_Target0
@@ -143,32 +166,50 @@ float4 ps_main(ps_input input) : SV_Target0
 		const float3x3 tangent_to_world = orthonormal_basis(normal_ws);
 
 		const int sample_count = 64;
+		const float inverse_sample_count = 1.0f / (float)sample_count;
 
 		for (int i = 0; i < sample_count; ++i)
 		{
 			const float2 x = hammersley(i, sample_count);
-			const float3 half_vector_ts = importance_sample_ggx(x, disney_roughness);
+
+			float3 half_vector_ts;
+			if (sampling_method == 0)
+			{
+				half_vector_ts = importance_sample_ggx(x, disney_roughness);
+			}
+			else
+			{
+				half_vector_ts = uniform_sample(x);
+			}
+
 			const float3 half_vector_ws = mul(half_vector_ts, tangent_to_world);
 
 			float3 direction_to_light_ws = reflect(-direction_to_camera_ws, half_vector_ws);
 
 			const float n_dot_l = saturate(dot(normal_ws, direction_to_light_ws));
-			const float n_dot_h = dot(normal_ws, half_vector_ws);
+			const float n_dot_h = saturate(dot(normal_ws, half_vector_ws));
 			const float l_dot_h = saturate(dot(direction_to_light_ws, half_vector_ws));
 
-			float ipdf = (4.0 * l_dot_h) / (distribution(n_dot_h, disney_roughness) * n_dot_h); // must be d_ggx
+			float inverse_pdf;
+			if (sampling_method == 0)
+			{
+				inverse_pdf = (4.0 * l_dot_h) / (distribution(n_dot_h, disney_roughness) * n_dot_h); // must be d_ggx
+			}
+			else
+			{
+				inverse_pdf = (4.0 * PI);
+			}
 
-			// spherical mapping a.k.a equirectangular a.k.a latlong
-			float phi = atan2(direction_to_light_ws.z, direction_to_light_ws.x);
-			float theta = acos(direction_to_light_ws.y);
-			float2 texcoord = float2(phi / (PI * 2), theta / PI);
+			float2 texcoord = spherical_map(direction_to_light_ws);
 
 			uint width, height, levels;
 			environment_specular_texture.GetDimensions(0, width, height, levels);
 
-			float3 light_color = environment_specular_texture.SampleLevel(default_sampler, texcoord, metalness * levels).rgb;
+			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, 0).rgb;
 
-			indirect_lighting += specular(light_color, n_dot_v, n_dot_l, n_dot_h, l_dot_h, disney_roughness) * ipdf;
+			const float3 f_s = specular(specular_color, n_dot_v, n_dot_l, n_dot_h, l_dot_h, disney_roughness) * inverse_pdf * inverse_sample_count;
+
+			indirect_lighting += f_s * n_dot_l * radiance * PI * image_based_lighting_scale;
 		}
 	}
 

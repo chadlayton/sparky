@@ -25,6 +25,7 @@
 #include "debug_gui_impl.h"
 
 #include "shaders/clouds.cbuffer.hlsli"
+#include "shaders/lighting.cbuffer.hlsli"
 
 #include <string>
 #include <cassert>
@@ -864,6 +865,7 @@ int main()
 	} constant_buffer_per_frame_data;
 
 	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
+	constant_buffer_lighting_per_frame_data lighting_per_frame_data;
 
 	sp_constant_buffer_heap constant_buffer_heap = sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
 
@@ -942,10 +944,8 @@ int main()
 			constant_buffer_per_frame = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_frame_data), &constant_buffer_per_frame_data);
 		}
 
-		sp_descriptor_handle constant_buffer_per_frame_clouds;
-		{
-			constant_buffer_per_frame_clouds = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
-		}	
+		sp_descriptor_handle constant_buffer_per_frame_clouds = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
+		sp_descriptor_handle constant_buffer_per_frame_lighting = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_lighting_per_frame_data), &lighting_per_frame_data);
 
 		// Record all the commands we need to render the scene into the command list.
 		{
@@ -1101,6 +1101,7 @@ int main()
 					&_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						constant_buffer_per_frame,
+						constant_buffer_per_frame_lighting,
 					});
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
@@ -1109,33 +1110,51 @@ int main()
 			//sp_debug_gui_show_demo_window();
 			bool open = true;
 			int window_flags = 0;
-			ImGui::Begin("Materials", &open, window_flags);
-			for (auto& entity : entities)
+			ImGui::Begin("Demo", &open, window_flags);
+
+			if (ImGui::CollapsingHeader("Camera"))
 			{
-				ImGui::PushID(&entity);
+				ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
+				ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
+				// TODO: Something is not right here e.g. <0,-1,0> is up
+				ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
+			}
 
-				for (int i = 0; i < entity.first.materials.size(); ++i)
+			if (ImGui::CollapsingHeader("Lighting"))
+			{
+				ImGui::DragInt("Sampling Method", &lighting_per_frame_data.sampling_method, 1.0, 0, 1);
+				ImGui::DragFloat("Image Based Lighting Scale", &lighting_per_frame_data.image_based_lighting_scale, 0.01f, 0.0f, 10.0f);
+			}
+			
+			if (ImGui::CollapsingHeader("Materials"))
+			{
+				for (auto& entity : entities)
 				{
-					model::material& material = entity.first.materials[i];
+					ImGui::PushID(&entity);
 
-					ImGui::PushID(&material);
-					ImGui::CollapsingHeader(material.name);
-					ImGui::ColorEdit3("Base Color", material.base_color_factor.data());
-					ImGui::DragFloat("Metalness", &material.metalness_factor, 0.01f, 0.0f, 1.0f);
-					ImGui::DragFloat("Roughness", &material.roughness_factor, 0.01f, 0.0f, 1.0f);
+					for (int i = 0; i < entity.first.materials.size(); ++i)
+					{
+						model::material& material = entity.first.materials[i];
+
+						ImGui::PushID(&material);
+
+						if (ImGui::TreeNode(material.name))
+						{
+							ImGui::ColorEdit3("Base Color", material.base_color_factor.data());
+							ImGui::DragFloat("Metalness", &material.metalness_factor, 0.01f, 0.0f, 1.0f);
+							ImGui::DragFloat("Roughness", &material.roughness_factor, 0.01f, 0.0f, 1.0f);
+
+							ImGui::TreePop();
+						}
+
+						ImGui::PopID();
+					}
+
 					ImGui::PopID();
 				}
-				ImGui::PopID();
 			}
 			ImGui::End();
 
-			ImGui::Begin("Camera", &open, window_flags);
-			ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
-			ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
-			// TODO: Something is not right here e.g. <0,-1,0> is up
-			ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
-
-			ImGui::End();
 			ImGui::Begin("Clouds", &open, window_flags);
 			ImGui::DragFloat("Sampling Scale Bias (Weather)", &clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Sampling Scale Bias (Density)", &clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
