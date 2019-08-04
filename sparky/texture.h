@@ -9,6 +9,8 @@
 #include <wrl.h>
 #include <d3d12.h>
 
+constexpr int sp_texture_mip_level_max = 16;
+
 enum class sp_texture_format
 {
 	r8g8b8a8,
@@ -20,12 +22,37 @@ enum class sp_texture_format
 	unknown,
 };
 
+enum class sp_texture_flags
+{
+	none = 0x00,
+	render_target = 0x01,
+};
+
+inline sp_texture_flags operator | (sp_texture_flags lhs, sp_texture_flags rhs)
+{
+	using T = std::underlying_type_t<sp_texture_flags>;
+	return static_cast<sp_texture_flags>(static_cast<T>(lhs) | static_cast<T>(rhs));
+}
+
+inline sp_texture_flags& operator |= (sp_texture_flags& lhs, sp_texture_flags rhs)
+{
+	lhs = lhs | rhs;
+	return lhs;
+}
+
+inline sp_texture_flags operator & (sp_texture_flags lhs, sp_texture_flags rhs)
+{ 
+	using T = std::underlying_type_t<sp_texture_flags>;
+	return static_cast<sp_texture_flags>(static_cast<T>(lhs) & static_cast<T>(rhs));
+}
+
 struct sp_texture_desc
 {
 	int width;
 	int height;
 	int depth;
 	sp_texture_format format;
+	sp_texture_flags flags;
 };
 
 struct sp_texture
@@ -35,10 +62,13 @@ struct sp_texture
 	int _height;
 	int _depth;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
+	int _num_mip_levels;
+	sp_texture_format _format;
 
 	sp_descriptor_handle _render_target_view;
 	sp_descriptor_handle _shader_resource_view;
 	sp_descriptor_handle _depth_stencil_view;
+	sp_descriptor_handle _unordered_access_view;
 
 	D3D12_RESOURCE_STATES _default_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 

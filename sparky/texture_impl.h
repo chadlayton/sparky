@@ -109,6 +109,16 @@ namespace detail
 	}
 }
 
+namespace detail
+{
+	int sp_texture_calculate_num_mip_levels(int height, int width)
+	{
+		return std::min(
+			sp_texture_mip_level_max, 
+			static_cast<int>(std::floor(std::log2(std::max(height, width)))) + 1);
+	}
+}
+
 sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& desc)
 {
 	assert(desc.depth > 0);
@@ -117,7 +127,6 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	sp_texture& texture = detail::resource_pools::textures[texture_handle.index];
 
 	D3D12_RESOURCE_DESC resource_desc_d3d12 = {};
-	resource_desc_d3d12.MipLevels = 1;
 	resource_desc_d3d12.Format = detail::sp_texture_format_get_base_format_d3d12(desc.format);
 	resource_desc_d3d12.Width = desc.width;
 	resource_desc_d3d12.Height = desc.height;
@@ -134,28 +143,41 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 
 		if (detail::sp_texture_format_is_depth(desc.format))
 		{
+			resource_desc_d3d12.MipLevels = 1;
 			resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 			texture._optimized_clear_value.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
 			texture._optimized_clear_value.DepthStencil.Depth = 1.0f;
 			texture._optimized_clear_value.DepthStencil.Stencil = 0;
+
+			optimized_clear_value = &texture._optimized_clear_value;
 		}
 		else
 		{
-			resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+			if ((desc.flags & sp_texture_flags::render_target) != sp_texture_flags::none)
+			{
+				resource_desc_d3d12.MipLevels = 1;
+				resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
-			texture._optimized_clear_value.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
-			texture._optimized_clear_value.Color[0] = 0.0f;
-			texture._optimized_clear_value.Color[1] = 0.0f;
-			texture._optimized_clear_value.Color[2] = 0.0f;
-			texture._optimized_clear_value.Color[3] = 0.0f;
+				texture._optimized_clear_value.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
+				texture._optimized_clear_value.Color[0] = 0.0f;
+				texture._optimized_clear_value.Color[1] = 0.0f;
+				texture._optimized_clear_value.Color[2] = 0.0f;
+				texture._optimized_clear_value.Color[3] = 0.0f;
+
+				optimized_clear_value = &texture._optimized_clear_value;
+			}
+			else
+			{
+				resource_desc_d3d12.MipLevels = detail::sp_texture_calculate_num_mip_levels(desc.width, desc.height);
+				resource_desc_d3d12.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			}
 		}
-
-		optimized_clear_value = &texture._optimized_clear_value;
 	}
 	else
 	{
 		resource_desc_d3d12.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+		resource_desc_d3d12.MipLevels = 1;
 	}
 
 	HRESULT hr = _sp._device->CreateCommittedResource(
@@ -175,6 +197,8 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	texture._width = desc.width;
 	texture._height = desc.height;
 	texture._depth = desc.depth;
+	texture._num_mip_levels = resource_desc_d3d12.MipLevels;
+	texture._format = desc.format;
 
 	// TODO: Including the SRV and RTV in the texture isn't ideal. Need to lookup texture by handle just to
 	// get another handle. The views should be first class types.
@@ -184,7 +208,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 	shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	shader_resource_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
-	shader_resource_view_desc_d3d12.Texture2D.MipLevels = 1;
+	shader_resource_view_desc_d3d12.Texture2D.MipLevels = -1;
 
 	if (desc.depth == 1)
 	{
@@ -211,14 +235,28 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		}
 		else
 		{
-			texture._render_target_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
+			if ((desc.flags & sp_texture_flags::render_target) != sp_texture_flags::none)
+			{
+				texture._render_target_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
 
-			D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
-			render_target_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
-			render_target_view_desc_d3d12.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			render_target_view_desc_d3d12.Texture2D.MipSlice = 0;
+				D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
+				render_target_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
+				render_target_view_desc_d3d12.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+				render_target_view_desc_d3d12.Texture2D.MipSlice = 0;
 
-			_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, texture._render_target_view._handle_cpu_d3d12);
+				_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, texture._render_target_view._handle_cpu_d3d12);
+			}
+			else
+			{
+				texture._unordered_access_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu);
+
+				D3D12_UNORDERED_ACCESS_VIEW_DESC unordered_access_view_desc_d3d12 = {};
+				unordered_access_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
+				unordered_access_view_desc_d3d12.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+				unordered_access_view_desc_d3d12.Texture2D.MipSlice = 0;
+
+				_sp._device->CreateUnorderedAccessView(texture._resource.Get(), nullptr, &unordered_access_view_desc_d3d12, texture._unordered_access_view._handle_cpu_d3d12);
+			}
 		}
 	}
 

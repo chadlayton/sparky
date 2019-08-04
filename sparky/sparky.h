@@ -26,6 +26,7 @@ struct sp
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _compute_queue;
 
 	sp_descriptor_heap _descriptor_heap_rtv_cpu;
 	sp_descriptor_heap _descriptor_heap_dsv_cpu;
@@ -46,8 +47,8 @@ void sp_shutdown();
 void sp_graphics_queue_execute(sp_graphics_command_list command_list);
 void sp_graphics_queue_wait_for_idle();
 
-// sp_compute_queue_execute(sp_compute_command_list command_list);
-// sp_compute_queue_wait_for_idle();
+void sp_compute_queue_execute(sp_compute_command_list command_list);
+void sp_compute_queue_wait_for_idle();
 
 void sp_device_wait_for_idle();
 void sp_swap_chain_present();
@@ -165,14 +166,26 @@ void sp_init(const sp_window& window)
 	}
 #endif
 
-	// Describe and create the command queue for graphics command lists
-	D3D12_COMMAND_QUEUE_DESC graphics_queue_desc = {};
-	graphics_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	graphics_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
+	// Describe and create the command queue for graphics and compute command lists
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> graphics_queue;
-	hr = device->CreateCommandQueue(&graphics_queue_desc, IID_PPV_ARGS(&graphics_queue));
-	assert(SUCCEEDED(hr));
+	{
+		D3D12_COMMAND_QUEUE_DESC graphics_queue_desc = {};
+		graphics_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		graphics_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+		hr = device->CreateCommandQueue(&graphics_queue_desc, IID_PPV_ARGS(&graphics_queue));
+		assert(SUCCEEDED(hr));
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> compute_queue;
+	{
+		D3D12_COMMAND_QUEUE_DESC compute_queue_desc = {};
+		compute_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		compute_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+
+		hr = device->CreateCommandQueue(&compute_queue_desc, IID_PPV_ARGS(&compute_queue));
+		assert(SUCCEEDED(hr));
+	}
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain3;
 	{
@@ -238,7 +251,7 @@ void sp_init(const sp_window& window)
 		root_parameters[2].InitAsDescriptorTable(1, &range_uav, D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
-		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+		sampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -253,7 +266,7 @@ void sp_init(const sp_window& window)
 		sampler.MaxLOD = D3D12_FLOAT32_MAX;
 		sampler.ShaderRegister = 0;
 		sampler.RegisterSpace = 0;
-		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC  root_signature_desc;
 		root_signature_desc.Init_1_1(static_cast<unsigned>(std::size(root_parameters)), root_parameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -269,6 +282,7 @@ void sp_init(const sp_window& window)
 	_sp._device = device;
 	_sp._swap_chain = swap_chain3;
 	_sp._graphics_queue = graphics_queue;
+	_sp._compute_queue = compute_queue;
 	_sp._root_signature = root_signature;
 
 	_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
@@ -342,6 +356,7 @@ void sp_shutdown()
 
 	_sp._swap_chain.Reset();
 	_sp._graphics_queue.Reset();
+	_sp._compute_queue.Reset();
 	_sp._root_signature.Reset();
 
 #if SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED
@@ -363,40 +378,59 @@ void sp_graphics_queue_execute(sp_graphics_command_list command_list)
 	_sp._graphics_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
 }
 
+namespace detail
+{
+	void sp_command_queue_wait_for_idle(ID3D12CommandQueue* command_queue)
+	{
+		// Create synchronization objects and wait until assets have been uploaded to the GPU.
+		Microsoft::WRL::ComPtr<ID3D12Fence> fence;
+		HRESULT hr = _sp._device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+		assert(SUCCEEDED(hr));
+
+		UINT64 next_fence_value = 1;
+
+		// Create an event handle to use for frame synchronization.
+		HANDLE fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		assert(fence_event);
+
+		// Signal and increment the fence value.
+		const UINT64 fence_value = next_fence_value;
+		hr = command_queue->Signal(fence.Get(), fence_value);
+		assert(SUCCEEDED(hr));
+		next_fence_value++;
+
+		// Wait until the previous frame is finished.
+		if (fence->GetCompletedValue() < fence_value)
+		{
+			hr = fence->SetEventOnCompletion(fence_value, fence_event);
+			assert(SUCCEEDED(hr));
+			WaitForSingleObject(fence_event, INFINITE);
+		}
+
+		CloseHandle(fence_event);
+	}
+}
+
 void sp_graphics_queue_wait_for_idle()
 {
-	// Create synchronization objects and wait until assets have been uploaded to the GPU.
-	Microsoft::WRL::ComPtr<ID3D12Fence> fence;
-	HRESULT hr = _sp._device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-	assert(SUCCEEDED(hr));
+	detail::sp_command_queue_wait_for_idle(_sp._graphics_queue.Get());
+}
 
-	UINT64 next_fence_value = 1;
+void sp_compute_queue_execute(sp_compute_command_list command_list)
+{
+	ID3D12CommandList* command_lists_d3d12[] = { command_list._command_list_d3d12.Get() };
+	_sp._compute_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
+}
 
-	// Create an event handle to use for frame synchronization.
-	HANDLE fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	assert(fence_event);
-
-	// Signal and increment the fence value.
-	const UINT64 fence_value = next_fence_value;
-	hr = _sp._graphics_queue->Signal(fence.Get(), fence_value);
-	assert(SUCCEEDED(hr));
-	next_fence_value++;
-
-	// Wait until the previous frame is finished.
-	if (fence->GetCompletedValue() < fence_value)
-	{
-		hr = fence->SetEventOnCompletion(fence_value, fence_event);
-		assert(SUCCEEDED(hr));
-		WaitForSingleObject(fence_event, INFINITE);
-	}
-
-	CloseHandle(fence_event);
+void sp_compute_queue_wait_for_idle()
+{
+	detail::sp_command_queue_wait_for_idle(_sp._compute_queue.Get());
 }
 
 void sp_device_wait_for_idle()
 {
 	sp_graphics_queue_wait_for_idle();
-	// sp_compute_queue_wait_for_idle();
+	sp_compute_queue_wait_for_idle();
 }
 
 void sp_swap_chain_present()
