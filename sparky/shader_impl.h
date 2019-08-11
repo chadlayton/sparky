@@ -69,6 +69,13 @@ namespace detail
 	{
 		return resource_pools::compute_shaders[handle.index];
 	}
+
+	void sp_pixel_shader_recreate(sp_pixel_shader_handle& handle)
+	{
+		sp_pixel_shader& old_shader = detail::resource_pools::pixel_shaders[handle.index];
+		sp_pixel_shader_handle new_handle = sp_pixel_shader_create(old_shader._desc);
+		std::swap(resource_pools::pixel_shaders[new_handle.index], resource_pools::pixel_shaders[handle.index]);
+	}
 }
 
 sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& desc)
@@ -84,7 +91,7 @@ sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& des
 
 	ID3DBlob* error_blob = nullptr;
 	HRESULT hr = D3DCompileFromFile(
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc.filepath).c_str(),
 		nullptr,
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"vs_main",
@@ -135,7 +142,7 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 
 	ID3DBlob* error_blob = nullptr;
 	HRESULT hr = D3DCompileFromFile(
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc.filepath).c_str(),
 		nullptr,
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"ps_main",
@@ -190,6 +197,8 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 		}
 	}
 
+	shader._desc = desc;
+
 	return shader_handle;
 }
 
@@ -206,7 +215,7 @@ sp_compute_shader_handle sp_compute_shader_create(const sp_compute_shader_desc& 
 
 	ID3DBlob* error_blob = nullptr;
 	HRESULT hr = D3DCompileFromFile(
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc._file_path).c_str(),
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc.filepath).c_str(),
 		nullptr,
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"cs_main",
@@ -225,4 +234,13 @@ sp_compute_shader_handle sp_compute_shader_create(const sp_compute_shader_desc& 
 	assert(SUCCEEDED(hr));
 
 	return shader_handle;
+}
+
+void sp_pixel_shader_destroy(sp_pixel_shader_handle handle)
+{
+	sp_compute_shader& shader = detail::resource_pools::compute_shaders[handle.index];
+
+	shader._blob.Reset();
+
+	sp_handle_free(&detail::resource_pools::pixel_shader_handles, handle);
 }

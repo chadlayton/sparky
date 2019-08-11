@@ -3,6 +3,9 @@
 #define SP_DEBUG_API_VALIDATION_LEVEL 1
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 
+// TODO: std::codecvt_utf8_utf16 deprecated in C++17 but no replacement offered...
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+
 #include "handle.h"
 #include "window.h"
 #include "vertex_buffer.h"
@@ -14,6 +17,7 @@
 #include "sparky.h"
 #include "math.h"
 #include "debug_gui.h"
+#include "file_watch.h"
 
 #include "command_list_impl.h"
 #include "constant_buffer_impl.h"
@@ -764,7 +768,7 @@ int main()
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::back,
-		});
+	});
 
 	sp_graphics_pipeline_state_handle gbuffer_double_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer_double_sided", {
 		gbuffer_vertex_shader_handle,
@@ -782,7 +786,7 @@ int main()
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::none,
-		});
+	});
 
 	sp_compute_shader_handle low_freq_noise_shader_handle = sp_compute_shader_create({ "shaders/low_freq_noise.hlsl" });
 
@@ -810,7 +814,11 @@ int main()
 		{
 			sp_texture_format::r10g10b10a2,
 		},
-		});
+	});
+
+	sp_file_watch_create("shaders/lighting.hlsl", [](const char* filepath) { 
+		std::cout << filepath << std::endl; 
+	});
 
 	// TODO: Be nicer if I could assign handles to the material. Better if I could not write completely custom callbacks. Maybe some rules like:
 	// material_override.create("MyMaterial").base_color_factor("Name", [](color* value) { value->r = 0; }).metalness(1.0).roughness(mul(3));
@@ -983,11 +991,7 @@ int main()
 
 				for (const std::pair<model, math::mat<4>>& entity : entities)
 				{
-					// C++17
-					// const auto& [model, transform] = entity;
-
-					const model& model = entity.first;
-					const math::mat<4>& transform = entity.second;
+					const auto& [model, transform] = entity;
 
 					for (int i = 0; i < static_cast<int>(model.meshes.size()); ++i)
 					{
@@ -1215,6 +1219,8 @@ int main()
 		++frame_num;
 
 		input_update(&input);
+
+		sp_file_watch_tick();
 	}
 
 	sp_device_wait_for_idle();
