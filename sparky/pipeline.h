@@ -40,12 +40,14 @@ struct sp_compute_pipeline_state_desc
 struct sp_graphics_pipeline_state
 {
 	const char* _name;
+	sp_graphics_pipeline_state_desc _desc;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
 };
 
 struct sp_compute_pipeline_state
 {
 	const char* _name;
+	sp_compute_pipeline_state_desc _desc;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
 };
 

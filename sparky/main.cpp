@@ -2,6 +2,7 @@
 #define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
 #define SP_DEBUG_API_VALIDATION_LEVEL 1
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
+#define SP_DEBUG_LIVE_SHADER_RELOADING 1
 
 // TODO: std::codecvt_utf8_utf16 deprecated in C++17 but no replacement offered...
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
@@ -816,9 +817,9 @@ int main()
 		},
 	});
 
-	sp_file_watch_create("shaders/lighting.hlsl", [](const char* filepath) { 
-		std::cout << filepath << std::endl; 
-	});
+	//sp_file_watch_create("shaders/lighting.hlsl", [](const char* filepath) { 
+	//	std::cout << filepath << std::endl; 
+	//});
 
 	// TODO: Be nicer if I could assign handles to the material. Better if I could not write completely custom callbacks. Maybe some rules like:
 	// material_override.create("MyMaterial").base_color_factor("Name", [](color* value) { value->r = 0; }).metalness(1.0).roughness(mul(3));

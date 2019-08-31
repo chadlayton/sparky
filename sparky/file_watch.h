@@ -18,7 +18,7 @@ namespace detail
 		std::array<uint8_t, sizeof(FILE_NOTIFY_INFORMATION) + MAX_PATH * sizeof(WCHAR)> buffer;
 		HANDLE file_handle;
 		HANDLE completion_handle;
-		std::map<std::string, std::function<void(const char*)>> file_watch_callbacks;
+		std::map<std::string, std::vector<std::function<void(const char*)>>> file_watch_callbacks;
 		OVERLAPPED overlapped;
 	};
 
@@ -66,9 +66,7 @@ void sp_file_watch_create(const char* filepath, std::function<void(const char*)>
 		
 	detail::sp_directory_watch& directory_watch = detail::g_watched_directories[directory];
 
-	assert(directory_watch.file_watch_callbacks.count(filename) == 0);
-
-	directory_watch.file_watch_callbacks[filename] = callback;
+	directory_watch.file_watch_callbacks[filename].push_back(callback);
 }
 
 void sp_file_watch_destroy()
@@ -112,7 +110,10 @@ void sp_file_watch_tick()
 				std::filesystem::path file_watch_path = std::filesystem::path(dir.first) / std::filesystem::path(filename);
 				std::string filepath = file_watch_path.string();
 
-				dir.second.file_watch_callbacks[filename](filepath.c_str());
+				for (auto& callback : dir.second.file_watch_callbacks[filename])
+				{
+					callback(filepath.c_str());
+				}
 			}
 
 			if (notification->NextEntryOffset == 0)

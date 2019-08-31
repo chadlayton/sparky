@@ -66,6 +66,9 @@
     <ClInclude Include="debug_gui_impl.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="file_watch.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="command_list_impl.h">
