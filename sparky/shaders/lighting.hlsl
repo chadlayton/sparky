@@ -73,16 +73,35 @@ float3 importance_sample_ggx(float2 Xi, float alpha)
 	return float3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta); 
 }
 
-float3 uniform_sample(float2 Xi)
+float importance_sample_ggx_inverse_pdf(float l_dot_h, float n_dot_h, float alpha)
 {
-	const float theta = 2.0 * PI * Xi.x;
-	const float phi = acos(1.0 - 2.0 * Xi.y);
+	return (4.0 * l_dot_h) / (distribution(n_dot_h, alpha) * n_dot_h); // TODO: Specify d_ggx instead of distribution 
+}
 
-	const float x = sin(phi) * cos(theta);
-	const float y = sin(phi) * sin(theta);
-	const float z = cos(phi);
+float3 uniform_sample_hemisphere(float2 Xi)
+{
+	float z = Xi.x;
+	float r = sqrt(max(0.0, 1.0 - z * z));
+	float phi = 2.0 * PI * Xi.y;
+	return float3(r * cos(phi), r * sin(phi), z);
+}
 
-	return float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
+float uniform_sample_hemisphere_inverse_pdf()
+{
+	return 2.0 * PI;
+}
+
+float3 uniform_sample_sphere(float2 Xi)
+{
+	float z = 1.0 - 2.0 * Xi.x;
+	float r = sqrt(max(0.0, 1.0 - z * z));
+	float phi = 2.0 * PI * Xi.y;
+	return float3(r * cos(phi), r * sin(phi), z);
+}
+
+float uniform_sample_sphere_inverse_pdf()
+{
+	return 4.0 * PI;
 }
 
 float3x3 orthonormal_basis(float3 n)
@@ -90,7 +109,7 @@ float3x3 orthonormal_basis(float3 n)
 	float3 up = abs(n.z) < (1 - EPSILON) ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
 
 	float3 v = normalize(cross(up, n));
-	float3 u = cross(n, v);
+	float3 u = normalize(cross(n, v));
 
 	return float3x3(v, u, n);
 }
@@ -172,19 +191,27 @@ float4 ps_main(ps_input input) : SV_Target0
 		{
 			const float2 x = hammersley(i, sample_count);
 
-			float3 half_vector_ts;
+			float3 direction_to_light_ws;
+			float3 half_vector_ws;
 			if (sampling_method == 0)
 			{
-				half_vector_ts = importance_sample_ggx(x, disney_roughness);
+				// In the case of importance_sample_ggx I'm getting back the half vector...
+				const float3 half_vector_ts = importance_sample_ggx(x, disney_roughness);
+				half_vector_ws = mul(half_vector_ts, tangent_to_world);
+				direction_to_light_ws = reflect(-direction_to_camera_ws, half_vector_ws);
+			}
+			else if (sampling_method == 1)
+			{
+				const float3 direction_to_light_ts = uniform_sample_sphere(x);
+				direction_to_light_ws = mul(direction_to_light_ts, tangent_to_world);
+				half_vector_ws = normalize(direction_to_light_ws + direction_to_camera_ws);
 			}
 			else
 			{
-				half_vector_ts = uniform_sample(x);
+				const float3 direction_to_light_ts = uniform_sample_hemisphere(x);
+				direction_to_light_ws = mul(direction_to_light_ts, tangent_to_world);
+				half_vector_ws = normalize(direction_to_light_ws + direction_to_camera_ws);
 			}
-
-			const float3 half_vector_ws = mul(half_vector_ts, tangent_to_world);
-
-			float3 direction_to_light_ws = reflect(-direction_to_camera_ws, half_vector_ws);
 
 			const float n_dot_l = saturate(dot(normal_ws, direction_to_light_ws));
 			const float n_dot_h = saturate(dot(normal_ws, half_vector_ws));
@@ -193,11 +220,15 @@ float4 ps_main(ps_input input) : SV_Target0
 			float inverse_pdf;
 			if (sampling_method == 0)
 			{
-				inverse_pdf = (4.0 * l_dot_h) / (distribution(n_dot_h, disney_roughness) * n_dot_h); // must be d_ggx
+				inverse_pdf = importance_sample_ggx_inverse_pdf(l_dot_h, n_dot_h, disney_roughness);
+			}
+			else if (sampling_method == 1)
+			{
+				inverse_pdf = uniform_sample_sphere_inverse_pdf();
 			}
 			else
 			{
-				inverse_pdf = (4.0 * PI);
+				inverse_pdf = uniform_sample_hemisphere_inverse_pdf();
 			}
 
 			float2 texcoord = spherical_map(direction_to_light_ws);
@@ -205,9 +236,9 @@ float4 ps_main(ps_input input) : SV_Target0
 			uint width, height, levels;
 			environment_specular_texture.GetDimensions(0, width, height, levels);
 
-			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, 0).rgb;
+			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, 0).rgb * inverse_pdf * inverse_sample_count;
 
-			const float3 f_s = specular(specular_color, n_dot_v, n_dot_l, n_dot_h, l_dot_h, disney_roughness) * inverse_pdf * inverse_sample_count;
+			const float3 f_s = specular(specular_color, n_dot_v, n_dot_l, n_dot_h, l_dot_h, disney_roughness);
 
 			indirect_lighting += f_s * n_dot_l * radiance * PI * image_based_lighting_scale;
 		}

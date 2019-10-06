@@ -7,6 +7,8 @@
 // TODO: std::codecvt_utf8_utf16 deprecated in C++17 but no replacement offered...
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
+#define DEMO_CLOUDS 0
+
 #include "handle.h"
 #include "window.h"
 #include "vertex_buffer.h"
@@ -729,6 +731,7 @@ int main()
 	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
 
+#if DEMO_CLOUDS
 	const void* cloud_shape_image_data = sp_image_volume_create_from_directory("textures/cloud_shape", "cloud_shape.%d.tga", 128);
 	sp_texture_handle cloud_shape_texture_handle = sp_texture_create("cloud_shape", { 128, 128, 128, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
 	sp_texture_update(cloud_shape_texture_handle, cloud_shape_image_data, 128 * 128 * 128 * 4, 4);
@@ -740,6 +743,7 @@ int main()
 	const void* cloud_weather_image_data = sp_image_create_from_file("textures/cloud_weather.tga");
 	sp_texture_handle cloud_weather_texture_handle = sp_texture_create("cloud_weather", { 512, 512, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
 	sp_texture_update(cloud_weather_texture_handle, cloud_weather_image_data, 512 * 512 * 4, 4);
+#endif
 
 	const void* environment_diffuse_image_data = sp_image_create_from_file_hdr("environments/Factory_Catwalk/Factory_Catwalk_Env.hdr");
 	sp_texture_handle environment_diffuse_texture = sp_texture_create("environment_diffuse", { 512, 256, 1, sp_texture_format::r32g32b32a32, sp_texture_flags::none });
@@ -1048,7 +1052,7 @@ int main()
 				}
 			}
 
-			/*
+#if DEMO_CLOUDS
 			// clouds
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
@@ -1077,7 +1081,8 @@ int main()
 						constant_buffer_per_frame_clouds,
 					});
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-			}*/
+			}
+#endif
 			
 			// lighting
 			{
@@ -1127,8 +1132,9 @@ int main()
 
 			if (ImGui::CollapsingHeader("Lighting"))
 			{
-				ImGui::DragInt("Sampling Method", &lighting_per_frame_data.sampling_method, 1.0, 0, 1);
+				ImGui::DragInt("Sampling Method", &lighting_per_frame_data.sampling_method, 0.1f, 0, 2);
 				ImGui::DragFloat("Image Based Lighting Scale", &lighting_per_frame_data.image_based_lighting_scale, 0.01f, 0.0f, 10.0f);
+				ImGui::DragFloat3("Direct Lighting", &constant_buffer_per_frame_data.sun_direction_ws[0]);
 			}
 			
 			if (ImGui::CollapsingHeader("Materials"))
@@ -1160,6 +1166,7 @@ int main()
 			}
 			ImGui::End();
 
+#if DEMO_CLOUDS
 			ImGui::Begin("Clouds", &open, window_flags);
 			ImGui::DragFloat("Sampling Scale Bias (Weather)", &clouds_per_frame_data.weather_sample_scale_bias, 0.01f, -1.0f, 1.0f);
 			ImGui::DragFloat("Sampling Scale Bias (Density)", &clouds_per_frame_data.shape_sample_scale_bias, 0.01f, -1.0f, 1.0f);
@@ -1188,6 +1195,7 @@ int main()
 			ImGui::DragFloat("Debug2", &clouds_per_frame_data.debug2, 100.01f,  0.0f, 10000.0f);
 			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 100.01f,  0.0f, 10000.0f);
 			ImGui::End();
+#endif
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
 			// since the default imgui implementation expects to be the only one using it.
