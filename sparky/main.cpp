@@ -41,6 +41,7 @@
 #include <vector>
 #include <utility>
 #include <iostream>
+#include <algorithm>
 
 #include <wrl.h>
 #include <shellapi.h>
@@ -130,6 +131,8 @@ void camera_update(camera* camera, const input& input)
 
 struct model
 {
+	char name[128];
+
 	struct material
 	{
 		char name[128];
@@ -143,8 +146,9 @@ struct model
 
 	struct mesh
 	{
-		int vertex_count;
+		int vertex_count = -1;
 		sp_vertex_buffer_handle vertex_buffer_handle;
+		int material_index = -1;
 	};
 
 	std::vector<mesh> meshes;
@@ -152,9 +156,11 @@ struct model
 	std::vector<sp_texture_handle> textures;
 };
 
-model model_create_cube(sp_texture_handle base_color_texture_handle, sp_texture_handle metalness_roughness_texture_handle)
+model model_create_cube(const char* name, sp_texture_handle base_color_texture_handle, sp_texture_handle metalness_roughness_texture_handle)
 {
 	model model;
+
+	strncpy(model.name, name, std::size(model.name) - 1);
 
 	model.textures.push_back(base_color_texture_handle);
 	model.textures.push_back(metalness_roughness_texture_handle);
@@ -232,6 +238,8 @@ model model_create_cube(sp_texture_handle base_color_texture_handle, sp_texture_
 		sp_vertex_buffer_update(mesh.vertex_buffer_handle, cube_vertices, sizeof(cube_vertices));
 
 		mesh.vertex_count = static_cast<int>(std::size(cube_vertices));
+
+		mesh.material_index = 0;
 	}
 
 	model.meshes.push_back(mesh);
@@ -300,7 +308,6 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 	fx::gltf::Document doc_fx = fx::gltf::LoadFromText(path, read_quotas_fx);
 
 	std::vector<const char*> image_paths;
-
 	for (const auto& texture_fx : doc_fx.textures)
 	{
 		const fx::gltf::Image& image_fx = doc_fx.images[texture_fx.source];
@@ -315,16 +322,30 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 		}
 	}
 
+	// Create materials
 	std::vector<model::material> materials;
-	std::vector<model::mesh> meshes;
+	materials.resize(doc_fx.materials.size());
+	std::transform(doc_fx.materials.begin(), doc_fx.materials.end(), materials.begin(), [](const fx::gltf::Material& material_fx) {
+		model::material material;
+		strcpy(material.name, material_fx.name.c_str());
+		material.base_color_texture_index = material_fx.pbrMetallicRoughness.baseColorTexture.index;
+		material.metalness_roughness_texture_index = material_fx.pbrMetallicRoughness.metallicRoughnessTexture.index;
+		material.base_color_factor = material_fx.pbrMetallicRoughness.baseColorFactor;
+		material.metalness_factor = material_fx.pbrMetallicRoughness.metallicFactor;
+		material.roughness_factor = material_fx.pbrMetallicRoughness.roughnessFactor;
+		material.double_sided = material_fx.doubleSided;
+		return material;
+	});
 
+	// XXX: We collapse glTF primitives and meshes into one type
+	std::vector<model::mesh> meshes;
 	for (const auto& mesh_fx : doc_fx.meshes)
 	{
-		for (const auto& primitive_gltf : mesh_fx.primitives)
+		for (const auto& primitive_fx : mesh_fx.primitives)
 		{
 			std::vector<unsigned> indices;
 			{
-				const auto& index_buffer_accessor_fx = doc_fx.accessors[primitive_gltf.indices];
+				const auto& index_buffer_accessor_fx = doc_fx.accessors[primitive_fx.indices];
 				const auto& index_buffer_view_fx = doc_fx.bufferViews[index_buffer_accessor_fx.bufferView];
 				const auto& index_buffer_fx = doc_fx.buffers[index_buffer_view_fx.buffer];
 
@@ -362,7 +383,7 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 			std::vector<math::vec<2>> texcoords;
 
 			// TODO: How to handle models that are missing expected vertex attributes?
-			for (const auto& attrib_fx : primitive_gltf.attributes)
+			for (const auto& attrib_fx : primitive_fx.attributes)
 			{
 				if (attrib_fx.first == "POSITION")
 				{
@@ -440,27 +461,12 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 				vertices.push_back({ positions[index], normals[index], texcoords[index], { 1.0f, 1.0f, 1.0f, 1.0f } });
 			}
 
-			model::material material;
-			{
-				const fx::gltf::Material& material_fx = doc_fx.materials[primitive_gltf.material];
-
-				strcpy(material.name, material_fx.name.c_str());
-				material.base_color_texture_index = material_fx.pbrMetallicRoughness.baseColorTexture.index;
-				material.metalness_roughness_texture_index = material_fx.pbrMetallicRoughness.metallicRoughnessTexture.index;
-				material.base_color_factor = material_fx.pbrMetallicRoughness.baseColorFactor;
-				material.metalness_factor = material_fx.pbrMetallicRoughness.metallicFactor;
-				material.roughness_factor = material_fx.pbrMetallicRoughness.roughnessFactor;
-				material.double_sided = material_fx.doubleSided;
-
-				if (on_material_created) on_material_created(material_fx.name.c_str(), &material, &image_paths);
-			}
-			materials.push_back(material);
-
 			model::mesh mesh;
 			{
 				mesh.vertex_buffer_handle = sp_vertex_buffer_create(mesh_fx.name.c_str(), { static_cast<int>(vertices.size() * sizeof(vertex)), static_cast<int>(sizeof(vertex)) });
 				sp_vertex_buffer_update(mesh.vertex_buffer_handle, vertices.data(), static_cast<int>(vertices.size() * sizeof(vertex)));
 				mesh.vertex_count = static_cast<int>(vertices.size());
+				mesh.material_index = primitive_fx.material;
 			}
 			meshes.push_back(mesh);
 		}
@@ -504,6 +510,7 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 
 	model model;
 
+	strncpy(model.name, path, std::size(model.name) - 1);
 	model.meshes = std::move(meshes);
 	model.materials = std::move(materials);
 	model.textures = std::move(textures);
@@ -514,11 +521,35 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 // TODO: Not sure how this should be handled. A render pass includes render targets which are part of the PSO.
 // So it seems like we would need to create PSO for each material in this render pass. On the fly? Or do we just
 // allow a finite number of combinations and build them all up front.
+//
+// I think materials need to be aware of render passes:
+// gbuffer_pass
+//   targets = {
+//     gbuffer1
+//     gbuffer2
+//     depth
+//   }
+//
+// Material
+//   gbuffer_pass
+//     gbuffer.hlsl
+//     vertex_format_a
+//   shadow_pass
+//     shadow.hlsl
+//     vertex_format_b
+// 
+// That would mean pipeline state becomes not-user facing. They get created automatically when we create a material
+// which looks at the passes.
+// 
+// And instead of "render pass", "task"
+//
+
+/*
 struct sp_render_pass_desc
 {
 	sp_texture_handle render_target_handles[4];
 	sp_texture_handle depth_stencil_buffer_handle;
-};
+};*/
 
 /*
 
@@ -533,6 +564,23 @@ struct sp_render_pass_desc
 	}
 
 	sp_graphics_command_list_set_pipeline_state(handle);
+*/
+
+/* 
+sp_frame_graph_desc desc;
+
+sp_frame_graph_builder_add_texture_resource(&desc, "base_color", r8g8b8);
+sp_frame_graph_builder_add_texture_resource(&desc, "depth", r8g8b8);
+
+sp_grame_graph_task_desc gbuffer_task_desc = sp_grame_graph_builder_add_task(&desc, "gbuffer_task");
+
+sp_frame_graph_task_builder_set_render_targets( { { "base_color", r8g8b8 } }, 
+
+sp_frame_graph graph = sp_frame_graph_create(desc);
+
+sp_frame_graph_task_desc* gbuffer_task = sp_frame_graph_task_create(&graph, "gbuffer_task");
+gbuffer_task->add_output("base_color");
+gbuffer_task->add_output("depth");
 */
 
 void* sp_image_create_from_file(const char* filename)
@@ -998,8 +1046,10 @@ int main()
 				{
 					const auto& [model, transform] = entity;
 
-					for (int i = 0; i < static_cast<int>(model.meshes.size()); ++i)
+					for (const model::mesh& mesh : model.meshes)
 					{
+						const model::material& material = model.materials[mesh.material_index];
+
 						sp_descriptor_handle constant_buffer_per_object;
 						{
 							__declspec(align(16)) struct constant_buffer_per_object_data
@@ -1011,15 +1061,15 @@ int main()
 
 							constant_buffer_per_object_data per_object_data{
 								transform,
-								{ model.materials[i].base_color_factor[0], model.materials[i].base_color_factor[1], model.materials[i].base_color_factor[2], model.materials[i].base_color_factor[3] },
-								{ model.materials[i].metalness_factor, model.materials[i].roughness_factor, 0.0f, 0.0f }
+								{ material.base_color_factor[0], material.base_color_factor[1], material.base_color_factor[2], material.base_color_factor[3] },
+								{ material.metalness_factor, material.roughness_factor, 0.0f, 0.0f }
 							};
 
 							constant_buffer_per_object = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_object_data), &per_object_data);
 						}
 
 						// TODO: We should probably be sorting based on some concept of material / pipeline state so we're not setting this for every draw.
-						if (model.materials[i].double_sided)
+						if (material.double_sided)
 						{
 							sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_double_sided_pipeline_state_handle);
 						}
@@ -1034,8 +1084,8 @@ int main()
 						sp_descriptor_copy_to_heap(
 							&_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
-								detail::sp_texture_pool_get(model.textures[model.materials[i].base_color_texture_index])._shader_resource_view,
-								detail::sp_texture_pool_get(model.textures[model.materials[i].metalness_roughness_texture_index])._shader_resource_view,
+								detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
+								detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
 							});
 						// Copy CBV
 						graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
@@ -1046,8 +1096,8 @@ int main()
 								constant_buffer_per_object
 							});
 
-						sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &model.meshes[i].vertex_buffer_handle, 1);
-						sp_graphics_command_list_draw_instanced(graphics_command_list, model.meshes[i].vertex_count, 1);
+						sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &mesh.vertex_buffer_handle, 1);
+						sp_graphics_command_list_draw_instanced(graphics_command_list, mesh.vertex_count, 1);
 					}
 				}
 			}
@@ -1143,10 +1193,12 @@ int main()
 				{
 					ImGui::PushID(&entity);
 
-					for (int i = 0; i < entity.first.materials.size(); ++i)
-					{
-						model::material& material = entity.first.materials[i];
+					auto& [model, transform] = entity;
 
+					ImGui::Text("%s", model.name);
+
+					for (auto& material : model.materials)
+					{
 						ImGui::PushID(&material);
 
 						if (ImGui::TreeNode(material.name))
