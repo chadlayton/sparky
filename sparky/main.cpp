@@ -518,53 +518,79 @@ model model_create_from_gltf(const char* path, std::function<void(const char*, m
 	return model;
 }
 
-// TODO: Not sure how this should be handled. A render pass includes render targets which are part of the PSO.
-// So it seems like we would need to create PSO for each material in this render pass. On the fly? Or do we just
-// allow a finite number of combinations and build them all up front.
+// TASK GRAPH MUSINGS
 //
-// I think materials need to be aware of render passes:
-// gbuffer_pass
-//   targets = {
+// gbuffer_render_task = {
+//   "gbuffer_render_task",
+//   inputs = {
+//   },
+//   outputs = {
 //     gbuffer1
 //     gbuffer2
 //     depth
+//   },
+//   submit = gbuffer_render_task_submit
+// }
+//
+// material = {
+//   {
+//     "gbuffer_render_task",
+//     { 
+//       gbuffer.hlsl,
+//       vertex_format = {
+//         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+//         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+//         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
+//       }
+//     }
+//   },
+//   {
+//     "shadow_render_task"
+//     {
+//       shadow.hlsl,
+//       vertex_format = {
+//         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+//       }
+//     }
 //   }
+// }
 //
-// Material
-//   gbuffer_pass
-//     gbuffer.hlsl
-//     vertex_format_a
-//   shadow_pass
-//     shadow.hlsl
-//     vertex_format_b
-// 
-// That would mean pipeline state becomes not-user facing. They get created automatically when we create a material
-// which looks at the passes.
-// 
-// And instead of "render pass", "task"
+// XXX: We could infer the vertex format with shader reflection.
 //
-
-/*
-struct sp_render_pass_desc
-{
-	sp_texture_handle render_target_handles[4];
-	sp_texture_handle depth_stencil_buffer_handle;
-};*/
-
-/*
-
-	sp_render_pass render_pass;
-	sp_material material;
-	
-	// ...
-	sp_graphics_pipeline_handle handle = sp_graphics_pipeline_lookup(render_pass.state, material.state);
-	if (!handle)
-	{
-		handle = sp_graphics_pipeline_create( {render_pass.state, material.state } );
-	}
-
-	sp_graphics_command_list_set_pipeline_state(handle);
-*/
+// XXX: This design implies pipeline state becomes not-user facing. They get created automatically when we create a material
+// which looks at the tasks for the render and depth target formats / count and the material for everything else.
+//
+// terrain_compute_task_submit()
+// {
+//   dispatch(terrain_compute_task);
+// }
+//
+// A compute_task would be simliar to material in that we tell it up front what resources are going to be required. Creates
+// a compute pipeline behind the scenes.
+//
+// XXX: May not even need to supply a submit func to compute tasks. Just provide all data and assume we're going
+// to call dispatch.
+// 
+// gbuffer_render_task_submit()
+// {
+//   for (models : scene)
+//   {
+//     draw(model.vertex_stream, model.material);
+//   }
+//   
+//   draw(terrain_vertex_buffers, terrain_material);
+// }
+//
+// XXX: The draw call could validate the vertex stream/buffer format satisfies that expected by the material
+//
+// shadow_render_task_submit()
+// {
+//   for (models : scene)
+//   {
+//     draw(model.position_only_vertex_stream, model.material);
+//   }
+// }
+//
 
 /* 
 sp_frame_graph_desc desc;
@@ -572,15 +598,17 @@ sp_frame_graph_desc desc;
 sp_frame_graph_builder_add_texture_resource(&desc, "base_color", r8g8b8);
 sp_frame_graph_builder_add_texture_resource(&desc, "depth", r8g8b8);
 
-sp_grame_graph_task_desc gbuffer_task_desc = sp_grame_graph_builder_add_task(&desc, "gbuffer_task");
+sp_grame_graph_task_desc gbuffer_task_desc = sp_frame_graph_builder_add_task(&desc, "gbuffer_task");
 
-sp_frame_graph_task_builder_set_render_targets( { { "base_color", r8g8b8 } }, 
+sp_frame_graph_task_builder_set_render_targets(&gbuffer_task_desc, { { "base_color", r8g8b8 } }, 
 
 sp_frame_graph graph = sp_frame_graph_create(desc);
 
 sp_frame_graph_task_desc* gbuffer_task = sp_frame_graph_task_create(&graph, "gbuffer_task");
 gbuffer_task->add_output("base_color");
 gbuffer_task->add_output("depth");
+
+
 */
 
 void* sp_image_create_from_file(const char* filename)
@@ -611,6 +639,7 @@ void* sp_image_volume_create_from_directory(const char* dirname, const char* for
 	const int image_volume_size_bytes = image_slice_size_bytes * volume_depth;
 
 	uint8_t* image_volume_data = static_cast<uint8_t*>(malloc(image_volume_size_bytes));
+	assert(image_volume_data);
 
 	for (int i = 0; i < volume_depth; ++i) 
 	{
@@ -918,10 +947,10 @@ int main()
 		math::mat<4> inverse_projection_matrix;
 		math::mat<4> inverse_view_projection_matrix;
 		math::vec<3> camera_position_ws;
-		float dummy;
+		float dummy = 0;
 		// TODO: Not sure if I want this in scene constants or a seprate lighting constants
 		math::vec<3> sun_direction_ws;
-		float dummy2;
+		float dummy2 = 0;
 
 	} constant_buffer_per_frame_data;
 
@@ -937,15 +966,6 @@ int main()
 	sp_texture_handle gbuffer_metalness_roughness_texture_handle = sp_texture_create("gbuffer_metalness_roughness", { window_width, window_height, 1, sp_texture_format::r10g10b10a2, sp_texture_flags::render_target });
 	sp_texture_handle gbuffer_normals_texture_handle = sp_texture_create("gbuffer_normals", { window_width, window_height, 1, sp_texture_format::r10g10b10a2, sp_texture_flags::render_target });
 	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d32 });
-
-	sp_render_pass_desc gbuffer_render_pass_desc = {
-		{
-			gbuffer_base_color_texture_handle,
-			gbuffer_metalness_roughness_texture_handle,
-			gbuffer_normals_texture_handle
-		},
-		gbuffer_depth_texture_handle
-	};
 
 	math::vec<3> sun_direction_ws = math::normalize<3>({ 0.25f, -1.0f, -0.5f });
 

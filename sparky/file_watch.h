@@ -15,7 +15,7 @@ namespace detail
 {
 	struct sp_directory_watch
 	{
-		std::array<uint8_t, sizeof(FILE_NOTIFY_INFORMATION) + MAX_PATH * sizeof(WCHAR)> buffer;
+		std::array<uint8_t, sizeof(FILE_NOTIFY_INFORMATION) + MAX_PATH * sizeof(WCHAR)> buffer = {};
 		HANDLE file_handle;
 		HANDLE completion_handle;
 		std::map<std::string, std::vector<std::function<void(const char*)>>> file_watch_callbacks;

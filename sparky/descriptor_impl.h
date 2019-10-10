@@ -42,7 +42,7 @@ sp_descriptor_heap sp_descriptor_heap_create(const char* name, const sp_descript
 	D3D12_DESCRIPTOR_HEAP_DESC heap_desc_d3d12 = {};
 	heap_desc_d3d12.NumDescriptors = desc.descriptor_capacity;
 	heap_desc_d3d12.Type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(desc.type);
-	heap_desc_d3d12.Flags = desc.visibility == sp_descriptor_heap_visibility::cpu_and_gpu ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	heap_desc_d3d12.Flags = (desc.visibility == sp_descriptor_heap_visibility::cpu_and_gpu) ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
 	HRESULT hr = _sp._device->CreateDescriptorHeap(&heap_desc_d3d12, IID_PPV_ARGS(&descriptor_heap._heap_d3d12));
 	assert(SUCCEEDED(hr));

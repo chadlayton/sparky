@@ -120,7 +120,7 @@ namespace detail
 	{
 		if (command_list._resource_transition_records_count > 0)
 		{
-			D3D12_RESOURCE_BARRIER render_target_transitions[64];
+			D3D12_RESOURCE_BARRIER render_target_transitions[64] = {};
 
 			memcpy(&render_target_transitions, command_list._resource_transition_records, command_list._resource_transition_records_count * sizeof(D3D12_RESOURCE_BARRIER));
 
@@ -153,7 +153,7 @@ void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& comma
 {
 	detail::sp_graphics_command_list_restore_default_resource_states(command_list);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE render_target_views[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
+	D3D12_CPU_DESCRIPTOR_HANDLE render_target_views[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {};
 
 	for (int i = 0; i < render_target_count; ++i)
 	{
