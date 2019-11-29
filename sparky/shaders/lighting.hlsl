@@ -144,9 +144,14 @@ float4 ps_main(ps_input input) : SV_Target0
 
 	const float depth = gbuffer_depth_texture.Sample(default_sampler, input.texcoord).r;
 
+	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, inverse_view_projection_matrix);
+	const float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws.xyz);
+
 	if (depth >= (1 - EPSILON))
 	{
-		return float4(0.0f, 0.0f, 0.0f, 1.0f);
+		const float3 direction_to_light_ws = normalize(-direction_to_camera_ws);
+		float2 texcoord = spherical_map(direction_to_light_ws);
+		return float4(environment_specular_texture.SampleLevel(default_sampler, texcoord, 0).rgb, 1.0);
 	}
 
 	const float3 base_color = gbuffer_base_color_texture.Sample(default_sampler, input.texcoord).xyz;
@@ -154,9 +159,6 @@ float4 ps_main(ps_input input) : SV_Target0
 	const float metalness = metalness_roughness.r;
 	const float disney_roughness = max(metalness_roughness.g * metalness_roughness.g, 0.003);
 	const float3 normal_ws = normalize(gbuffer_normal_map_texture.Sample(default_sampler, input.texcoord).xyz * 2 - 1);
-
-	const float3 position_ws = position_ws_from_depth(depth, input.texcoord, inverse_view_projection_matrix);
-	const float3 direction_to_camera_ws = normalize(camera_position_ws - position_ws.xyz);
 
 	const float3 diffuse_color = base_color * (1.0f - metalness);
 	const float3 specular_color = lerp(0.04f, base_color, metalness);
@@ -236,7 +238,10 @@ float4 ps_main(ps_input input) : SV_Target0
 			uint width, height, levels;
 			environment_specular_texture.GetDimensions(0, width, height, levels);
 
-			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, 0).rgb * inverse_pdf * inverse_sample_count;
+			// TODO: Lots of fireflies. Try sampling the light source and then maybe MIS?
+			uint mip = 0;
+
+			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, mip).rgb * inverse_pdf * inverse_sample_count;
 
 			const float3 f_s = specular(specular_color, n_dot_v, n_dot_l, n_dot_h, l_dot_h, disney_roughness);
 
