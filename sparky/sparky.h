@@ -268,7 +268,7 @@ void sp_init(const sp_window& window)
 		sampler.RegisterSpace = 0;
 		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC  root_signature_desc;
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
 		root_signature_desc.Init_1_1(static_cast<unsigned>(std::size(root_parameters)), root_parameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		Microsoft::WRL::ComPtr<ID3DBlob> error_blob;

@@ -1,5 +1,5 @@
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
-#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
+#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 0
 #define SP_DEBUG_API_VALIDATION_LEVEL 1
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 #define SP_DEBUG_LIVE_SHADER_RELOADING 1
@@ -673,8 +673,7 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 
 	for (int i = 1; i < texture._num_mip_levels; ++i)
 	{
-		ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() };
-		compute_command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps)), descriptor_heaps);
+		sp_compute_command_list_begin(compute_command_list);
 
 		compute_command_list._command_list_d3d12->SetComputeRootSignature(_sp._root_signature.Get());
 
@@ -724,13 +723,11 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 		sp_compute_command_list_set_pipeline_state(compute_command_list, generate_mipmaps_pipeline_state_handle);
 		sp_compute_command_list_dispatch(compute_command_list, texture._width >> 1, texture._height >> 1, 1);
 
-		sp_compute_command_list_close(compute_command_list);
+		sp_compute_command_list_end(compute_command_list);
 
 		sp_compute_queue_execute(compute_command_list);
 
 		sp_compute_queue_wait_for_idle();
-		
-		sp_compute_command_list_reset(compute_command_list);
 	}
 
 	sp_compute_command_list_destroy(compute_command_list);
@@ -1030,13 +1027,12 @@ int main()
 
 		// Record all the commands we need to render the scene into the command list.
 		{
+			sp_graphics_command_list_begin(graphics_command_list);
+			sp_compute_command_list_begin(compute_command_list);
+
 			// TODO: This could probably be done automatically somewhere.
 			graphics_command_list._command_list_d3d12->SetGraphicsRootSignature(_sp._root_signature.Get());
 			compute_command_list._command_list_d3d12->SetComputeRootSignature(_sp._root_signature.Get());
-
-			// TODO: The call to SetDescriptorHeaps is expensive. Only want to do once per command list. Only do it automatically when starting new command list.
-			ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() };
-			graphics_command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps)), descriptor_heaps);
 
 			sp_graphics_command_list_set_viewport(graphics_command_list, { 0.0f, 0.0f, window_width, window_height });
 			sp_graphics_command_list_set_scissor_rect(graphics_command_list, { 0, 0, window_width, window_height });
@@ -1100,7 +1096,7 @@ int main()
 
 						// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
 						// Copy SRV
-						graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, _sp._descriptor_heap_cbv_srv_uav_gpu);
 						sp_descriptor_copy_to_heap(
 							&_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
@@ -1108,7 +1104,7 @@ int main()
 								detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
 							});
 						// Copy CBV
-						graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, _sp._descriptor_heap_cbv_srv_uav_gpu);
 						sp_descriptor_copy_to_heap(
 							&_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
@@ -1276,8 +1272,8 @@ int main()
 
 			detail::sp_debug_gui_record_draw_commands(graphics_command_list);
 
-			sp_graphics_command_list_close(graphics_command_list);
-			sp_compute_command_list_close(compute_command_list);
+			sp_graphics_command_list_end(graphics_command_list);
+			sp_compute_command_list_end(compute_command_list);
 
 			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
 			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
@@ -1289,9 +1285,6 @@ int main()
 
 		// TODO: Need to double buffer command lists/heaps/etc so we can start recording next frame immediately.
 		sp_device_wait_for_idle();
-
-		sp_graphics_command_list_reset(graphics_command_list);
-		sp_compute_command_list_reset(compute_command_list);
 
 		sp_constant_buffer_heap_reset(&constant_buffer_heap);
 

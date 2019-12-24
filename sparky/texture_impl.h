@@ -311,6 +311,8 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 	// TODO: Should this use a copy command list/queue
 	sp_graphics_command_list texture_update_command_list = sp_graphics_command_list_create(texture._name, {});
 
+	sp_graphics_command_list_begin(texture_update_command_list);
+
 	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), texture._default_state, D3D12_RESOURCE_STATE_COPY_DEST));
 
 	UpdateSubresources(texture_update_command_list._command_list_d3d12.Get(),
@@ -323,7 +325,7 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 
 	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, texture._default_state));
 
-	sp_graphics_command_list_close(texture_update_command_list);
+	sp_graphics_command_list_end(texture_update_command_list);
 
 	sp_graphics_queue_execute(texture_update_command_list);
 
