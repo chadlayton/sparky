@@ -1129,7 +1129,7 @@ int main()
 				sp_graphics_command_list_set_render_targets(graphics_command_list, clouds_render_target_handles, static_cast<int>(std::size(clouds_render_target_handles)), {});
 
 				// Copy SRV
-				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, _sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
 					&_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
@@ -1139,7 +1139,7 @@ int main()
 						detail::sp_texture_pool_get(cloud_weather_texture_handle)._shader_resource_view,
 					});
 				// Copy CBV
-				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head( _sp._descriptor_heap_cbv_srv_uav_gpu )._handle_gpu_d3d12);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, _sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
 					&_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
@@ -1150,6 +1150,7 @@ int main()
 			}
 #endif
 			
+#if !DEMO_CLOUDS
 			// lighting
 			{
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
@@ -1160,7 +1161,7 @@ int main()
 				sp_graphics_command_list_set_render_targets(graphics_command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
 
 				// Copy SRV
-				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, _sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
 					&_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
@@ -1172,7 +1173,7 @@ int main()
 					});
 
 				// Copy CBV
-				graphics_command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(1, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, _sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
 					&_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
@@ -1182,6 +1183,7 @@ int main()
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
 			}
+#endif
 
 			//sp_debug_gui_show_demo_window();
 			bool open = true;
