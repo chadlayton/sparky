@@ -2,8 +2,10 @@
 
 #include "handle.h"
 
-#include <wrl.h>
+#define NOMINMAX
 #include <d3d12.h>
+
+#include <wrl.h>
 
 struct sp_vertex_shader_desc
 {

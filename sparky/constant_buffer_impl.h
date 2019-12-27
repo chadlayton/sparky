@@ -6,6 +6,7 @@
 
 #include <array>
 
+#define NOMINMAX
 #include <d3d12.h>
 
 sp_constant_buffer_heap sp_constant_buffer_heap_create(const char* name, const sp_constant_buffer_heap_desc& desc)

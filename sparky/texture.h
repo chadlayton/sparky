@@ -6,8 +6,10 @@
 
 #include <vector>
 
-#include <wrl.h>
+#define NOMINMAX
 #include <d3d12.h>
+
+#include <wrl.h>
 
 constexpr int sp_texture_mip_level_max = 16;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <codecvt>
 
 const UINT g_pixel_size_bytes = 4;

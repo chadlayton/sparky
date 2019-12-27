@@ -2,6 +2,7 @@
 
 #include "command_list.h"
 #include "vertex_buffer.h"
+#include "pipeline.h"
 
 #include <codecvt>
 
@@ -9,14 +10,26 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 {
 	sp_graphics_command_list command_list;
 
-	HRESULT hr = _sp._device->CreateCommandAllocator(
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(&command_list._command_allocator_d3d12));
-	assert(SUCCEEDED(hr));
+	HRESULT hr;
+
+	for (int i = 0; i < k_back_buffer_count; ++i)
+	{
+		hr = _sp._device->CreateCommandAllocator(
+			D3D12_COMMAND_LIST_TYPE_DIRECT,
+			IID_PPV_ARGS(&command_list._command_allocator_d3d12[i]));
+		assert(SUCCEEDED(hr));
 
 #if SP_DEBUG_RESOURCE_NAMING_ENABLED
-	command_list._command_allocator_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+		command_list._command_allocator_d3d12[i]->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
 #endif
+
+		hr = _sp._device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&command_list._fences[i]));
+		assert(SUCCEEDED(hr));
+
+		command_list._events[i] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+		command_list._wait_values[i] = 0;
+	}
 
 	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
 	if (desc.pipeline_state_handle)
@@ -27,7 +40,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 	hr = _sp._device->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		command_list._command_allocator_d3d12.Get(),
+		command_list._command_allocator_d3d12[0].Get(),
 		pipeline_state_d3d12,
 		IID_PPV_ARGS(&command_list._command_list_d3d12));
 	assert(SUCCEEDED(hr));
@@ -46,11 +59,25 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 
 void sp_graphics_command_list_begin(sp_graphics_command_list& command_list)
 {
-	HRESULT hr = command_list._command_allocator_d3d12->Reset();
+	HRESULT hr = S_OK;
+
+	command_list._back_buffer_index = _sp._back_buffer_index;
+
+	const UINT64 completed_value = command_list._fences[command_list._back_buffer_index]->GetCompletedValue();
+	if (completed_value < command_list._wait_values[command_list._back_buffer_index])
+	{
+		hr = command_list._fences[command_list._back_buffer_index]->SetEventOnCompletion(command_list._wait_values[command_list._back_buffer_index], command_list._events[command_list._back_buffer_index]);
+		assert(SUCCEEDED(hr));
+
+		DWORD result = WaitForSingleObject(command_list._events[command_list._back_buffer_index], INFINITE);
+		assert(result == WAIT_OBJECT_0);
+	}
+
+	hr = command_list._command_allocator_d3d12[command_list._back_buffer_index]->Reset();
 	assert(SUCCEEDED(hr));
 
 	hr = command_list._command_list_d3d12->Reset(
-		command_list._command_allocator_d3d12.Get(),
+		command_list._command_allocator_d3d12[command_list._back_buffer_index].Get(),
 		nullptr);
 	assert(SUCCEEDED(hr));
 
@@ -218,7 +245,7 @@ void sp_graphics_command_list_set_pipeline_state(sp_graphics_command_list& comma
 	command_list._command_list_d3d12->SetPipelineState(detail::sp_graphics_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
 }
 
-void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int slot, sp_descriptor_heap table)
+void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int slot, const sp_descriptor_heap& table)
 {
 	command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(slot, sp_descriptor_heap_get_head(table)._handle_gpu_d3d12);
 }
@@ -235,7 +262,10 @@ void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list)
 {
 	command_list._name = nullptr;
 	command_list._command_list_d3d12.Reset();
-	command_list._command_allocator_d3d12.Reset();
+	for (int i = 0; i < k_back_buffer_count; ++i)
+	{
+		command_list._command_allocator_d3d12[i].Reset();
+	}
 }
 
 sp_compute_command_list sp_compute_command_list_create(const char* name, const sp_compute_command_list_desc& desc)

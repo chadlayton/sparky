@@ -2,6 +2,7 @@
 
 #include <array>
 
+#define NOMINMAX
 #include <d3d12.h>
 
 struct sp_descriptor_handle;

@@ -1,8 +1,11 @@
 #pragma once
-#include <wrl.h>
-#include <d3d12.h>
 
 #include "handle.h"
+
+#define NOMINMAX
+#include <d3d12.h>
+
+#include <wrl.h>
 
 struct sp_vertex_buffer_desc
 {

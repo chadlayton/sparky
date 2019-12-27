@@ -1,7 +1,9 @@
 #pragma once
 
-#include <wrl.h>
+#define NOMINMAX
 #include <d3d12.h>
+
+#include <wrl.h>
 
 // TODO: sp_descriptor_heap_cpu and sp_descriptor_heap_gpu? Most heaps are cpu only and tracking gpu 
 // handles has some overhead. And only cbv_srv_uav and samplers can be gpu (shader visible). Would

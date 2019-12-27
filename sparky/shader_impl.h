@@ -8,10 +8,12 @@
 #include <codecvt>
 #include <unordered_map>
 
-#include <wrl.h>
+#define NOMINMAX
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <d3d12shader.h>
+
+#include <wrl.h>
 
 #if 0
 struct sp_shader_reflection

@@ -4,9 +4,10 @@
 #include "texture.h"
 #include "shader.h"
 
-#include <wrl.h>
-
+#define NOMINMAX
 #include <d3d12.h>
+
+#include <wrl.h>
 
 struct sp_input_element_desc
 {

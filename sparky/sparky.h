@@ -1,31 +1,41 @@
 #pragma once
 
+const int k_back_buffer_count = 3;
+const int k_frame_latency_max = 2;
+
 #include "command_list.h"
 #include "constant_buffer.h"
 #include "pipeline.h"
 #include "descriptor.h"
 #include "debug_gui.h"
+#include "window.h"
+#include "vertex_buffer.h"
+
 #include "d3dx12.h"
 
 #if SP_DEBUG_RENDERDOC_HOOK_ENABLED
 #include <RenderDoc\renderdoc_app.h>
 #endif
 
-#include <wrl.h>
+#define NOMINMAX
 #include <d3d12.h>
 #include <dxgi1_3.h>
 #include <dxgi1_4.h>
 
+#include <wrl.h>
+
 #include <array>
 
-const int k_back_buffer_count = 2;
+struct sp_window;
 
 struct sp
 {
 	Microsoft::WRL::ComPtr<ID3D12Device> _device;
 	Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
+	int _back_buffer_index;
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
+	int _graphics_queue_next_fence_value = 0;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _compute_queue;
 
 	sp_descriptor_heap _descriptor_heap_rtv_cpu;
@@ -39,15 +49,17 @@ struct sp
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
 
 	sp_texture_handle _back_buffer_texture_handles[k_back_buffer_count];
+
+
 } _sp;
 
 void sp_init(const sp_window& window);
 void sp_shutdown();
 
-void sp_graphics_queue_execute(sp_graphics_command_list command_list);
+void sp_graphics_queue_execute(sp_graphics_command_list& command_list);
 void sp_graphics_queue_wait_for_idle();
 
-void sp_compute_queue_execute(sp_compute_command_list command_list);
+void sp_compute_queue_execute(sp_compute_command_list& command_list);
 void sp_compute_queue_wait_for_idle();
 
 void sp_device_wait_for_idle();
@@ -192,6 +204,7 @@ void sp_init(const sp_window& window)
 		RECT window_client_rect;
 		GetClientRect(static_cast<HWND>(window._handle), &window_client_rect);
 
+		// TODO: Option to use 
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc = {};
 		swap_chain_desc.BufferCount = k_back_buffer_count;
 		swap_chain_desc.Width = window_client_rect.right;
@@ -200,6 +213,7 @@ void sp_init(const sp_window& window)
 		swap_chain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		swap_chain_desc.SampleDesc.Count = 1;
+		swap_chain_desc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT; // TODO: Add option to use GetFrameLatencyWaitableObject
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain1;
 		hr = dxgi_factory->CreateSwapChainForHwnd(
@@ -215,24 +229,12 @@ void sp_init(const sp_window& window)
 		hr = swap_chain1.As(&swap_chain3);
 		assert(SUCCEEDED(hr));
 	}
+	swap_chain3->SetMaximumFrameLatency(k_frame_latency_max);
 
 	// TODO: Support for fullscreen transitions.
 	hr = dxgi_factory->MakeWindowAssociation(static_cast<HWND>(window._handle), DXGI_MWA_NO_ALT_ENTER);
 	assert(SUCCEEDED(hr));
 
-	/*
-	Root Signature defines the number of arguments and their types :
-		Constants
-		Descriptors
-		Descriptor Tables
-	Performance improves with fewer DWORDs used
-		Keep argument list short
-	Try not to change this signature too often
-		A few times per frame
-
-	Analog of function signature and function call arguments
-	The main( int argc, char *argv[] ) {}; for your GPU code
-	*/
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
 	{
 		// https://www.slideshare.net/GaelHofemeier/efficient-rendering-with-directx-12-on-intel-graphics
@@ -281,6 +283,7 @@ void sp_init(const sp_window& window)
 
 	_sp._device = device;
 	_sp._swap_chain = swap_chain3;
+	_sp._back_buffer_index = swap_chain3->GetCurrentBackBufferIndex();
 	_sp._graphics_queue = graphics_queue;
 	_sp._compute_queue = compute_queue;
 	_sp._root_signature = root_signature;
@@ -372,10 +375,14 @@ void sp_shutdown()
 	_sp._device.Reset();
 }
 
-void sp_graphics_queue_execute(sp_graphics_command_list command_list)
+void sp_graphics_queue_execute(sp_graphics_command_list& command_list)
 {
 	ID3D12CommandList* command_lists_d3d12[] = { command_list._command_list_d3d12.Get() };
-	_sp._graphics_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
+	_sp._graphics_queue->ExecuteCommandLists(static_cast<UINT>(std::size(command_lists_d3d12)), command_lists_d3d12);
+
+	command_list._wait_values[command_list._back_buffer_index] = _sp._graphics_queue_next_fence_value;
+	_sp._graphics_queue->Signal(command_list._fences[command_list._back_buffer_index].Get(), _sp._graphics_queue_next_fence_value);
+	++_sp._graphics_queue_next_fence_value;
 }
 
 namespace detail
@@ -416,7 +423,7 @@ void sp_graphics_queue_wait_for_idle()
 	detail::sp_command_queue_wait_for_idle(_sp._graphics_queue.Get());
 }
 
-void sp_compute_queue_execute(sp_compute_command_list command_list)
+void sp_compute_queue_execute(sp_compute_command_list& command_list)
 {
 	ID3D12CommandList* command_lists_d3d12[] = { command_list._command_list_d3d12.Get() };
 	_sp._compute_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
@@ -435,6 +442,8 @@ void sp_device_wait_for_idle()
 
 void sp_swap_chain_present()
 {
-	HRESULT hr = _sp._swap_chain->Present(1, 0);
+	HRESULT hr = _sp._swap_chain->Present(0, 0);
 	assert(SUCCEEDED(hr));
+
+	_sp._back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 }

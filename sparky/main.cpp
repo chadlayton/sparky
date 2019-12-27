@@ -9,15 +9,16 @@
 
 #define DEMO_CLOUDS 0
 
+#include "sparky.h"
+
 #include "handle.h"
 #include "window.h"
 #include "vertex_buffer.h"
+#include "texture.h"
 #include "command_list.h"
 #include "constant_buffer.h"
-#include "texture.h"
 #include "shader.h"
 #include "pipeline.h"
-#include "sparky.h"
 #include "math.h"
 #include "debug_gui.h"
 #include "file_watch.h"
@@ -800,9 +801,8 @@ int main()
 
 	sp_window window = sp_window_create("demo", { window_width, window_height });
 
-	sp_init(window);
+	sp_init(window); // TODO: define root signature
 
-	int back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 	int frame_num = 0;
 
 #if DEMO_CLOUDS
@@ -1120,7 +1120,7 @@ int main()
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
 
 				sp_texture_handle clouds_render_target_handles[] = {
-					_sp._back_buffer_texture_handles[back_buffer_index]
+					_sp._back_buffer_texture_handles[_sp.back_buffer_index]
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, clouds_render_target_handles, static_cast<int>(std::size(clouds_render_target_handles)), {});
 
@@ -1152,7 +1152,7 @@ int main()
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
 
 				sp_texture_handle lighting_render_target_handles[] = {
-					_sp._back_buffer_texture_handles[back_buffer_index]
+					_sp._back_buffer_texture_handles[_sp._back_buffer_index] // TODO: sp_swap_chain_get_back_buffer
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
 
@@ -1278,15 +1278,10 @@ int main()
 
 		sp_swap_chain_present();
 
-		// TODO: Need to double buffer command lists/heaps/etc so we can start recording next frame immediately.
-		sp_device_wait_for_idle();
-
 		sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
 		sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		sp_constant_buffer_heap_reset(&constant_buffer_heap);
-
-		back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
 
 		++frame_num;
 

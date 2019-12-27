@@ -5,8 +5,10 @@
 #include <cassert>
 #include <codecvt>
 
-#include <wrl.h>
+#define NOMINMAX
 #include <d3d12.h>
+
+#include <wrl.h>
 
 namespace detail
 {
