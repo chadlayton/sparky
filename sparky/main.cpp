@@ -733,10 +733,6 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 	sp_compute_command_list_destroy(compute_command_list);
 }
 
-// sp_graphics_command_list_set_descriptor_table(root_signature_param::draw_textures,  draw_textures_table);
-// sp_descriptor_table_parameter("Taco")
-// sp_create_root_signature<DescriptorTable<
-
 int main()
 {
 	const int window_width = 1280;
@@ -1034,10 +1030,6 @@ int main()
 			sp_graphics_command_list_begin(graphics_command_list);
 			sp_compute_command_list_begin(compute_command_list);
 
-			// TODO: This could probably be done automatically somewhere.
-			graphics_command_list._command_list_d3d12->SetGraphicsRootSignature(_sp._root_signature.Get());
-			compute_command_list._command_list_d3d12->SetComputeRootSignature(_sp._root_signature.Get());
-
 			sp_graphics_command_list_set_viewport(graphics_command_list, { 0.0f, 0.0f, window_width, window_height });
 			sp_graphics_command_list_set_scissor_rect(graphics_command_list, { 0, 0, window_width, window_height });
 
@@ -1280,9 +1272,6 @@ int main()
 
 			sp_graphics_command_list_end(graphics_command_list);
 			sp_compute_command_list_end(compute_command_list);
-
-			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
-			sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 		}
 
 		sp_graphics_queue_execute(graphics_command_list);
@@ -1291,6 +1280,9 @@ int main()
 
 		// TODO: Need to double buffer command lists/heaps/etc so we can start recording next frame immediately.
 		sp_device_wait_for_idle();
+
+		sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
+		sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		sp_constant_buffer_heap_reset(&constant_buffer_heap);
 

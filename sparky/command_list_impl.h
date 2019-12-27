@@ -56,6 +56,8 @@ void sp_graphics_command_list_begin(sp_graphics_command_list& command_list)
 
 	ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() }; // TODO: sampler heap?
 	command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<UINT>(std::size(descriptor_heaps)), descriptor_heaps);
+
+	command_list._command_list_d3d12->SetGraphicsRootSignature(_sp._root_signature.Get());
 }
 
 namespace detail
@@ -286,6 +288,8 @@ void sp_compute_command_list_begin(sp_compute_command_list& command_list)
 
 	ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() }; // TODO: sampler heap?
 	command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<UINT>(std::size(descriptor_heaps)), descriptor_heaps);
+
+	command_list._command_list_d3d12->SetComputeRootSignature(_sp._root_signature.Get());
 }
 
 void sp_compute_command_list_set_pipeline_state(sp_compute_command_list& command_list, const sp_compute_pipeline_state_handle& pipeline_state_handle)
