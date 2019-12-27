@@ -6,7 +6,6 @@
 #include <imgui.h>
 #include <imgui.cpp>
 #include <imgui_draw.cpp>
-#include <imgui_demo.cpp>
 #include <imgui_widgets.cpp>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_win32.cpp>
@@ -22,7 +21,7 @@ namespace detail
 		ImGui::CreateContext();
 
 		ImGui_ImplWin32_Init(window._handle);
-		ImGui_ImplDX12_Init(device, 2, DXGI_FORMAT_R10G10B10A2_UNORM, font_descriptor_handle._handle_cpu_d3d12, font_descriptor_handle._handle_gpu_d3d12);
+		ImGui_ImplDX12_Init(device, 2, DXGI_FORMAT_R10G10B10A2_UNORM, _sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get(), font_descriptor_handle._handle_cpu_d3d12, font_descriptor_handle._handle_gpu_d3d12);
 	}
 
 	void sp_debug_gui_shutdown()
@@ -45,10 +44,4 @@ namespace detail
 		ImGui::Render();
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), comand_list._command_list_d3d12.Get());
 	}
-}
-
-void sp_debug_gui_show_demo_window()
-{
-	bool show = true;
-	ImGui::ShowDemoWindow(&show);
 }

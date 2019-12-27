@@ -733,6 +733,10 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 	sp_compute_command_list_destroy(compute_command_list);
 }
 
+// sp_graphics_command_list_set_descriptor_table(root_signature_param::draw_textures,  draw_textures_table);
+// sp_descriptor_table_parameter("Taco")
+// sp_create_root_signature<DescriptorTable<
+
 int main()
 {
 	const int window_width = 1280;
