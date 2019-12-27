@@ -33,8 +33,9 @@ struct sp_graphics_command_list
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _command_allocator_d3d12[k_back_buffer_count];
 
 	Microsoft::WRL::ComPtr<ID3D12Fence> _fences[k_back_buffer_count];
-	HANDLE _events[k_back_buffer_count];
-	int _wait_values[k_back_buffer_count];
+	HANDLE _fence_events[k_back_buffer_count];
+	UINT64 _fence_values[k_back_buffer_count];
+	UINT64 _next_fence_value = 0;
 
 	int _back_buffer_index;
 

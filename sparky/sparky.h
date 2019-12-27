@@ -35,7 +35,6 @@ struct sp
 	int _back_buffer_index;
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
-	int _graphics_queue_next_fence_value = 0;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _compute_queue;
 
 	sp_descriptor_heap _descriptor_heap_rtv_cpu;
@@ -56,10 +55,10 @@ struct sp
 void sp_init(const sp_window& window);
 void sp_shutdown();
 
-void sp_graphics_queue_execute(sp_graphics_command_list& command_list);
+void sp_graphics_queue_execute(const sp_graphics_command_list& command_list);
 void sp_graphics_queue_wait_for_idle();
 
-void sp_compute_queue_execute(sp_compute_command_list& command_list);
+void sp_compute_queue_execute(const sp_compute_command_list& command_list);
 void sp_compute_queue_wait_for_idle();
 
 void sp_device_wait_for_idle();
@@ -375,14 +374,12 @@ void sp_shutdown()
 	_sp._device.Reset();
 }
 
-void sp_graphics_queue_execute(sp_graphics_command_list& command_list)
+void sp_graphics_queue_execute(const sp_graphics_command_list& command_list)
 {
 	ID3D12CommandList* command_lists_d3d12[] = { command_list._command_list_d3d12.Get() };
 	_sp._graphics_queue->ExecuteCommandLists(static_cast<UINT>(std::size(command_lists_d3d12)), command_lists_d3d12);
 
-	command_list._wait_values[command_list._back_buffer_index] = _sp._graphics_queue_next_fence_value;
-	_sp._graphics_queue->Signal(command_list._fences[command_list._back_buffer_index].Get(), _sp._graphics_queue_next_fence_value);
-	++_sp._graphics_queue_next_fence_value;
+	_sp._graphics_queue->Signal(command_list._fences[command_list._back_buffer_index].Get(), command_list._fence_values[command_list._back_buffer_index]);
 }
 
 namespace detail

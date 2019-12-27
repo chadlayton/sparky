@@ -26,9 +26,9 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 		hr = _sp._device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&command_list._fences[i]));
 		assert(SUCCEEDED(hr));
 
-		command_list._events[i] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		command_list._fence_events[i] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
-		command_list._wait_values[i] = 0;
+		command_list._fence_values[i] = 0;
 	}
 
 	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
@@ -64,14 +64,16 @@ void sp_graphics_command_list_begin(sp_graphics_command_list& command_list)
 	command_list._back_buffer_index = _sp._back_buffer_index;
 
 	const UINT64 completed_value = command_list._fences[command_list._back_buffer_index]->GetCompletedValue();
-	if (completed_value < command_list._wait_values[command_list._back_buffer_index])
+	if (completed_value < command_list._fence_values[command_list._back_buffer_index])
 	{
-		hr = command_list._fences[command_list._back_buffer_index]->SetEventOnCompletion(command_list._wait_values[command_list._back_buffer_index], command_list._events[command_list._back_buffer_index]);
+		hr = command_list._fences[command_list._back_buffer_index]->SetEventOnCompletion(command_list._fence_values[command_list._back_buffer_index], command_list._fence_events[command_list._back_buffer_index]);
 		assert(SUCCEEDED(hr));
 
-		DWORD result = WaitForSingleObject(command_list._events[command_list._back_buffer_index], INFINITE);
+		DWORD result = WaitForSingleObject(command_list._fence_events[command_list._back_buffer_index], INFINITE);
 		assert(result == WAIT_OBJECT_0);
 	}
+
+	command_list._fence_values[command_list._back_buffer_index] = ++command_list._next_fence_value;
 
 	hr = command_list._command_allocator_d3d12[command_list._back_buffer_index]->Reset();
 	assert(SUCCEEDED(hr));
@@ -265,6 +267,8 @@ void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list)
 	for (int i = 0; i < k_back_buffer_count; ++i)
 	{
 		command_list._command_allocator_d3d12[i].Reset();
+		command_list._fences[i].Reset();
+		CloseHandle(command_list._fence_events[i]);
 	}
 }
 
