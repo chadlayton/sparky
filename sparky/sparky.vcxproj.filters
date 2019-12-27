@@ -1,81 +1,85 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
+    <Filter Include="source">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="source\command_list.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\command_list_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\constant_buffer.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\constant_buffer_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\d3dx12.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\debug_gui.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\debug_gui_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\descriptor.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\descriptor_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\file_watch.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\frame_graph.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\handle.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\math.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\pipeline.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\pipeline_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\shader.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\shader_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\sparky.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\texture.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\texture_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\vertex_buffer.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\vertex_buffer_impl.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\window.h">
+      <Filter>source</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source\main.cpp">
+      <Filter>source</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="handle.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="window.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="math.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="constant_buffer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="command_list.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="texture.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sparky.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pipeline.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vertex_buffer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="shader.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vertex_buffer_impl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pipeline_impl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="constant_buffer_impl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="shader_impl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="descriptor.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="descriptor_impl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="debug_gui.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="debug_gui_impl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="file_watch.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="command_list_impl.h">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="texture_impl.h">
-      <Filter>Source Files</Filter>
-    </None>
   </ItemGroup>
 </Project>

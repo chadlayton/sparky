@@ -32,8 +32,8 @@
 #include "descriptor_impl.h"
 #include "debug_gui_impl.h"
 
-#include "shaders/clouds.cbuffer.hlsli"
-#include "shaders/lighting.cbuffer.hlsli"
+#include "../shaders/clouds.cbuffer.hlsli"
+#include "../shaders/lighting.cbuffer.hlsli"
 
 #include <string>
 #include <cassert>
