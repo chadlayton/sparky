@@ -177,9 +177,9 @@ sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* na
 	sp_compute_pipeline_state& pipeline_state = detail::resource_pools::compute_pipelines[pipeline_state_handle.index];
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc_d3d12 = {};
-	pipeline_state_desc_d3d12.pRootSignature = _sp._root_signature.Get();
+	pipeline_state_desc_d3d12.pRootSignature = detail::_sp._root_signature.Get();
 	pipeline_state_desc_d3d12.CS = CD3DX12_SHADER_BYTECODE(detail::sp_compute_shader_pool_get(desc.compute_shader_handle)._blob.Get());
-	HRESULT hr = _sp._device->CreateComputePipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state._impl));
+	HRESULT hr = detail::_sp._device->CreateComputePipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state._impl));
 	assert(SUCCEEDED(hr));
 
 #if SP_DEBUG_RESOURCE_NAMING_ENABLED

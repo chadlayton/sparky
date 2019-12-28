@@ -14,7 +14,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 
 	for (int i = 0; i < k_back_buffer_count; ++i)
 	{
-		hr = _sp._device->CreateCommandAllocator(
+		hr = detail::_sp._device->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
 			IID_PPV_ARGS(&command_list._command_allocator_d3d12[i]));
 		assert(SUCCEEDED(hr));
@@ -23,7 +23,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 		command_list._command_allocator_d3d12[i]->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
 #endif
 
-		hr = _sp._device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&command_list._fences[i]));
+		hr = detail::_sp._device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&command_list._fences[i]));
 		assert(SUCCEEDED(hr));
 
 		command_list._fence_events[i] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -37,7 +37,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 		pipeline_state_d3d12 = detail::sp_graphics_pipeline_state_pool_get(desc.pipeline_state_handle)._impl.Get();
 	}
 
-	hr = _sp._device->CreateCommandList(
+	hr = detail::_sp._device->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
 		command_list._command_allocator_d3d12[0].Get(),
@@ -61,7 +61,7 @@ void sp_graphics_command_list_begin(sp_graphics_command_list& command_list)
 {
 	HRESULT hr = S_OK;
 
-	command_list._back_buffer_index = _sp._back_buffer_index;
+	command_list._back_buffer_index = detail::_sp._back_buffer_index;
 
 	const UINT64 completed_value = command_list._fences[command_list._back_buffer_index]->GetCompletedValue();
 	if (completed_value < command_list._fence_values[command_list._back_buffer_index])
@@ -83,10 +83,10 @@ void sp_graphics_command_list_begin(sp_graphics_command_list& command_list)
 		nullptr);
 	assert(SUCCEEDED(hr));
 
-	ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() }; // TODO: sampler heap?
+	ID3D12DescriptorHeap* descriptor_heaps[] = { detail::_sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() }; // TODO: sampler heap?
 	command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<UINT>(std::size(descriptor_heaps)), descriptor_heaps);
 
-	command_list._command_list_d3d12->SetGraphicsRootSignature(_sp._root_signature.Get());
+	command_list._command_list_d3d12->SetGraphicsRootSignature(detail::_sp._root_signature.Get());
 }
 
 namespace detail
@@ -276,7 +276,7 @@ sp_compute_command_list sp_compute_command_list_create(const char* name, const s
 {
 	sp_compute_command_list command_list;
 
-	HRESULT hr = _sp._device->CreateCommandAllocator(
+	HRESULT hr = detail::_sp._device->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_COMPUTE,
 		IID_PPV_ARGS(&command_list._command_allocator_d3d12));
 	assert(SUCCEEDED(hr));
@@ -291,7 +291,7 @@ sp_compute_command_list sp_compute_command_list_create(const char* name, const s
 		pipeline_state_d3d12 = detail::sp_compute_pipeline_state_pool_get(desc.pipeline_state_handle)._impl.Get();
 	}
 
-	hr = _sp._device->CreateCommandList(
+	hr = detail::_sp._device->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_COMPUTE,
 		command_list._command_allocator_d3d12.Get(),
@@ -320,10 +320,10 @@ void sp_compute_command_list_begin(sp_compute_command_list& command_list)
 		nullptr);
 	assert(SUCCEEDED(hr));
 
-	ID3D12DescriptorHeap* descriptor_heaps[] = { _sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() }; // TODO: sampler heap?
+	ID3D12DescriptorHeap* descriptor_heaps[] = { detail::_sp._descriptor_heap_cbv_srv_uav_gpu._heap_d3d12.Get() }; // TODO: sampler heap?
 	command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<UINT>(std::size(descriptor_heaps)), descriptor_heaps);
 
-	command_list._command_list_d3d12->SetComputeRootSignature(_sp._root_signature.Get());
+	command_list._command_list_d3d12->SetComputeRootSignature(detail::_sp._root_signature.Get());
 }
 
 void sp_compute_command_list_set_pipeline_state(sp_compute_command_list& command_list, const sp_compute_pipeline_state_handle& pipeline_state_handle)

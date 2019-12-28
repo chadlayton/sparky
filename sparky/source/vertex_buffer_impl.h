@@ -41,7 +41,7 @@ sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_verte
 	// recommended. Every time the GPU needs it, the upload heap will be marshalled 
 	// over. Please read up on Default Heap usage. An upload heap is used here for 
 	// code simplicity.
-	hr = _sp._device->CreateCommittedResource(
+	hr = detail::_sp._device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(desc._size_bytes),

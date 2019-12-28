@@ -18,7 +18,7 @@ sp_constant_buffer_heap sp_constant_buffer_heap_create(const char* name, const s
 	// A constant buffer is expected to be 256 byte aligned so the heap should as well
 	const int size_bytes_aligned = (desc.size_bytes + 255) & ~255;
 
-	HRESULT hr = _sp._device->CreateCommittedResource(
+	HRESULT hr = detail::_sp._device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(size_bytes_aligned),
@@ -53,7 +53,7 @@ sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_
 {
 	const int size_bytes_aligned = (size_bytes + 255) & ~255;
 
-	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 	D3D12_CONSTANT_BUFFER_VIEW_DESC constant_buffer_view_desc = {};
 	constant_buffer_view_desc.BufferLocation = constant_buffer_heap->_resource->GetGPUVirtualAddress() + constant_buffer_heap->_head;
@@ -61,7 +61,7 @@ sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_
 
 	assert(constant_buffer_heap->_head + size_bytes_aligned <= constant_buffer_heap->_size_bytes);
 
-	_sp._device->CreateConstantBufferView(&constant_buffer_view_desc, constant_buffer_view._handle_cpu_d3d12);
+	detail::_sp._device->CreateConstantBufferView(&constant_buffer_view_desc, constant_buffer_view._handle_cpu_d3d12);
 
 	// TODO: This is probably dumb. Could map the buffer once per frame.
 	{

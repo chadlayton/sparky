@@ -1,3 +1,4 @@
+#define SP_HEADER_ONLY 1
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
 #define SP_DEBUG_RENDERDOC_HOOK_ENABLED 0
 #define SP_DEBUG_API_VALIDATION_LEVEL 1
@@ -10,27 +11,6 @@
 #define DEMO_CLOUDS 0
 
 #include "sparky.h"
-
-#include "handle.h"
-#include "window.h"
-#include "vertex_buffer.h"
-#include "texture.h"
-#include "command_list.h"
-#include "constant_buffer.h"
-#include "shader.h"
-#include "pipeline.h"
-#include "math.h"
-#include "debug_gui.h"
-#include "file_watch.h"
-
-#include "command_list_impl.h"
-#include "constant_buffer_impl.h"
-#include "pipeline_impl.h"
-#include "texture_impl.h"
-#include "vertex_buffer_impl.h"
-#include "shader_impl.h"
-#include "descriptor_impl.h"
-#include "debug_gui_impl.h"
 
 #include "../shaders/clouds.cbuffer.hlsli"
 #include "../shaders/lighting.cbuffer.hlsli"
@@ -676,20 +656,20 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 	{
 		sp_compute_command_list_begin(compute_command_list);
 
-		compute_command_list._command_list_d3d12->SetComputeRootSignature(_sp._root_signature.Get());
+		compute_command_list._command_list_d3d12->SetComputeRootSignature(detail::_sp._root_signature.Get());
 
 		compute_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(texture._resource.Get()));
 
-		sp_descriptor_handle unordered_access_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+		sp_descriptor_handle unordered_access_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		D3D12_UNORDERED_ACCESS_VIEW_DESC unordered_access_view_desc_d3d12 = {};
 		unordered_access_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(texture._format);
 		unordered_access_view_desc_d3d12.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		unordered_access_view_desc_d3d12.Texture2D.MipSlice = i;
 
-		_sp._device->CreateUnorderedAccessView(texture._resource.Get(), nullptr, &unordered_access_view_desc_d3d12, unordered_access_view._handle_cpu_d3d12);
+		detail::_sp._device->CreateUnorderedAccessView(texture._resource.Get(), nullptr, &unordered_access_view_desc_d3d12, unordered_access_view._handle_cpu_d3d12);
 
-		sp_descriptor_handle shader_resource_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+		sp_descriptor_handle shader_resource_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 		shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -706,17 +686,17 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 			shader_resource_view_desc_d3d12.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
 		}
 
-		_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, shader_resource_view._handle_cpu_d3d12);
+		detail::_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, shader_resource_view._handle_cpu_d3d12);
 
-		compute_command_list._command_list_d3d12->SetComputeRootDescriptorTable(0, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+		compute_command_list._command_list_d3d12->SetComputeRootDescriptorTable(0, sp_descriptor_heap_get_head(detail::_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 		sp_descriptor_copy_to_heap(
-			&_sp._descriptor_heap_cbv_srv_uav_gpu,
+			&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 			{
 				shader_resource_view,
 			});
-		compute_command_list._command_list_d3d12->SetComputeRootDescriptorTable(2, sp_descriptor_heap_get_head(_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
+		compute_command_list._command_list_d3d12->SetComputeRootDescriptorTable(2, sp_descriptor_heap_get_head(detail::_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 		sp_descriptor_copy_to_heap(
-			&_sp._descriptor_heap_cbv_srv_uav_gpu,
+			&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 			{
 				unordered_access_view,
 			});
@@ -1092,17 +1072,17 @@ int main()
 
 						// TODO: The descriptors could all be baked per-draw call (if not going to adopt bindless)
 						// Copy SRV
-						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, _sp._descriptor_heap_cbv_srv_uav_gpu);
+						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 						sp_descriptor_copy_to_heap(
-							&_sp._descriptor_heap_cbv_srv_uav_gpu,
+							&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
 								detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
 								detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
 							});
 						// Copy CBV
-						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, _sp._descriptor_heap_cbv_srv_uav_gpu);
+						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 						sp_descriptor_copy_to_heap(
-							&_sp._descriptor_heap_cbv_srv_uav_gpu,
+							&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
 								constant_buffer_per_frame,
 								constant_buffer_per_object
@@ -1120,14 +1100,14 @@ int main()
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
 
 				sp_texture_handle clouds_render_target_handles[] = {
-					_sp._back_buffer_texture_handles[_sp.back_buffer_index]
+					detail::_sp._back_buffer_texture_handles[_sp.back_buffer_index]
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, clouds_render_target_handles, static_cast<int>(std::size(clouds_render_target_handles)), {});
 
 				// Copy SRV
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, _sp._descriptor_heap_cbv_srv_uav_gpu);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&_sp._descriptor_heap_cbv_srv_uav_gpu,
+					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view,
 						detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view,
@@ -1135,9 +1115,9 @@ int main()
 						detail::sp_texture_pool_get(cloud_weather_texture_handle)._shader_resource_view,
 					});
 				// Copy CBV
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, _sp._descriptor_heap_cbv_srv_uav_gpu);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&_sp._descriptor_heap_cbv_srv_uav_gpu,
+					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						constant_buffer_per_frame,
 						constant_buffer_per_frame_clouds,
@@ -1152,14 +1132,14 @@ int main()
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
 
 				sp_texture_handle lighting_render_target_handles[] = {
-					_sp._back_buffer_texture_handles[_sp._back_buffer_index] // TODO: sp_swap_chain_get_back_buffer
+					detail::_sp._back_buffer_texture_handles[detail::_sp._back_buffer_index] // TODO: sp_swap_chain_get_back_buffer
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
 
 				// Copy SRV
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, _sp._descriptor_heap_cbv_srv_uav_gpu);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&_sp._descriptor_heap_cbv_srv_uav_gpu,
+					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view,
 						detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view,
@@ -1169,9 +1149,9 @@ int main()
 					});
 
 				// Copy CBV
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, _sp._descriptor_heap_cbv_srv_uav_gpu);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&_sp._descriptor_heap_cbv_srv_uav_gpu,
+					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						constant_buffer_per_frame,
 						constant_buffer_per_frame_lighting,
@@ -1265,7 +1245,7 @@ int main()
 
 			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
 			// since the default imgui implementation expects to be the only one using it.
-			ID3D12DescriptorHeap* descriptor_heaps2[] = { _sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get() };
+			ID3D12DescriptorHeap* descriptor_heaps2[] = { detail::_sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get() };
 			graphics_command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps2)), descriptor_heaps2);
 
 			detail::sp_debug_gui_record_draw_commands(graphics_command_list);
@@ -1278,8 +1258,8 @@ int main()
 
 		sp_swap_chain_present();
 
-		sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_gpu);
-		sp_descriptor_heap_reset(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+		sp_descriptor_heap_reset(&detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
+		sp_descriptor_heap_reset(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		sp_constant_buffer_heap_reset(&constant_buffer_heap);
 

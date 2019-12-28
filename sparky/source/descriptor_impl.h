@@ -46,14 +46,14 @@ sp_descriptor_heap sp_descriptor_heap_create(const char* name, const sp_descript
 	heap_desc_d3d12.Type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(desc.type);
 	heap_desc_d3d12.Flags = (desc.visibility == sp_descriptor_heap_visibility::cpu_and_gpu) ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-	HRESULT hr = _sp._device->CreateDescriptorHeap(&heap_desc_d3d12, IID_PPV_ARGS(&descriptor_heap._heap_d3d12));
+	HRESULT hr = detail::_sp._device->CreateDescriptorHeap(&heap_desc_d3d12, IID_PPV_ARGS(&descriptor_heap._heap_d3d12));
 	assert(SUCCEEDED(hr));
 
 #if SP_DEBUG_RESOURCE_NAMING_ENABLED
 	descriptor_heap._heap_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
 #endif
 
-	descriptor_heap._descriptor_size = _sp._device->GetDescriptorHandleIncrementSize(heap_desc_d3d12.Type);
+	descriptor_heap._descriptor_size = detail::_sp._device->GetDescriptorHandleIncrementSize(heap_desc_d3d12.Type);
 	descriptor_heap._base = {
 		descriptor_heap._heap_d3d12->GetCPUDescriptorHandleForHeapStart(),
 		descriptor_heap._heap_d3d12->GetGPUDescriptorHandleForHeapStart()
@@ -113,7 +113,7 @@ void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const s
 	}
 #endif
 
-	_sp._device->CopyDescriptors(
+	detail::_sp._device->CopyDescriptors(
 		dest_descriptor_range_count,
 		dest_descriptor_range_starts,
 		dest_descriptor_range_sizes,

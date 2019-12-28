@@ -181,7 +181,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		resource_desc_d3d12.MipLevels = 1;
 	}
 
-	HRESULT hr = _sp._device->CreateCommittedResource(
+	HRESULT hr = detail::_sp._device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&resource_desc_d3d12,
@@ -204,7 +204,7 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 	// TODO: Including the SRV and RTV in the texture isn't ideal. Need to lookup texture by handle just to
 	// get another handle. The views should be first class types.
 
-	texture._shader_resource_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu);
+	texture._shader_resource_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 	shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -220,43 +220,43 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		shader_resource_view_desc_d3d12.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
 	}
 
-	_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, texture._shader_resource_view._handle_cpu_d3d12);
+	detail::_sp._device->CreateShaderResourceView(texture._resource.Get(), &shader_resource_view_desc_d3d12, texture._shader_resource_view._handle_cpu_d3d12);
 
 	if (desc.depth == 1)
 	{
 		if (detail::sp_texture_format_is_depth(desc.format))
 		{
-			texture._depth_stencil_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_dsv_cpu);
+			texture._depth_stencil_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_dsv_cpu);
 
 			D3D12_DEPTH_STENCIL_VIEW_DESC depth_stencil_view_desc_d3d12 = {};
 			depth_stencil_view_desc_d3d12.Format = detail::sp_texture_format_get_dsv_format_d3d12(desc.format);
 			depth_stencil_view_desc_d3d12.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-			_sp._device->CreateDepthStencilView(texture._resource.Get(), &depth_stencil_view_desc_d3d12, texture._depth_stencil_view._handle_cpu_d3d12);
+			detail::_sp._device->CreateDepthStencilView(texture._resource.Get(), &depth_stencil_view_desc_d3d12, texture._depth_stencil_view._handle_cpu_d3d12);
 		}
 		else
 		{
 			if ((desc.flags & sp_texture_flags::render_target) != sp_texture_flags::none)
 			{
-				texture._render_target_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
+				texture._render_target_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_rtv_cpu);
 
 				D3D12_RENDER_TARGET_VIEW_DESC render_target_view_desc_d3d12 = {};
 				render_target_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
 				render_target_view_desc_d3d12.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 				render_target_view_desc_d3d12.Texture2D.MipSlice = 0;
 
-				_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, texture._render_target_view._handle_cpu_d3d12);
+				detail::_sp._device->CreateRenderTargetView(texture._resource.Get(), &render_target_view_desc_d3d12, texture._render_target_view._handle_cpu_d3d12);
 			}
 			else
 			{
-				texture._unordered_access_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_cbv_srv_uav_cpu);
+				texture._unordered_access_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
 
 				D3D12_UNORDERED_ACCESS_VIEW_DESC unordered_access_view_desc_d3d12 = {};
 				unordered_access_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(desc.format);
 				unordered_access_view_desc_d3d12.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 				unordered_access_view_desc_d3d12.Texture2D.MipSlice = 0;
 
-				_sp._device->CreateUnorderedAccessView(texture._resource.Get(), nullptr, &unordered_access_view_desc_d3d12, texture._unordered_access_view._handle_cpu_d3d12);
+				detail::_sp._device->CreateUnorderedAccessView(texture._resource.Get(), nullptr, &unordered_access_view_desc_d3d12, texture._unordered_access_view._handle_cpu_d3d12);
 			}
 		}
 	}
@@ -287,7 +287,7 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> texture_upload_buffer;
 
-	HRESULT hr = _sp._device->CreateCommittedResource(
+	HRESULT hr = detail::_sp._device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(upload_buffer_size_bytes),

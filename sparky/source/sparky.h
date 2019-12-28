@@ -3,13 +3,17 @@
 const int k_back_buffer_count = 3;
 const int k_frame_latency_max = 2;
 
-#include "command_list.h"
-#include "constant_buffer.h"
-#include "pipeline.h"
-#include "descriptor.h"
-#include "debug_gui.h"
+#include "handle.h"
 #include "window.h"
 #include "vertex_buffer.h"
+#include "texture.h"
+#include "command_list.h"
+#include "constant_buffer.h"
+#include "shader.h"
+#include "pipeline.h"
+#include "math.h"
+#include "debug_gui.h"
+#include "file_watch.h"
 
 #include "d3dx12.h"
 
@@ -28,29 +32,32 @@ const int k_frame_latency_max = 2;
 
 struct sp_window;
 
-struct sp
+namespace detail
 {
-	Microsoft::WRL::ComPtr<ID3D12Device> _device;
-	Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
-	int _back_buffer_index;
+	static inline struct sp
+	{
+		Microsoft::WRL::ComPtr<ID3D12Device> _device;
+		Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
+		int _back_buffer_index;
 
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _compute_queue;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _compute_queue;
 
-	sp_descriptor_heap _descriptor_heap_rtv_cpu;
-	sp_descriptor_heap _descriptor_heap_dsv_cpu;
-	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu;
-	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu_transient;
-	sp_descriptor_heap _descriptor_heap_cbv_srv_uav_gpu;
+		sp_descriptor_heap _descriptor_heap_rtv_cpu;
+		sp_descriptor_heap _descriptor_heap_dsv_cpu;
+		sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu;
+		sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu_transient;
+		sp_descriptor_heap _descriptor_heap_cbv_srv_uav_gpu;
 
-	sp_descriptor_heap _descriptor_heap_debug_gui_gpu;
+		sp_descriptor_heap _descriptor_heap_debug_gui_gpu;
 
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
 
-	sp_texture_handle _back_buffer_texture_handles[k_back_buffer_count];
+		sp_texture_handle _back_buffer_texture_handles[k_back_buffer_count];
 
 
-} _sp;
+	} _sp;
+}
 
 void sp_init(const sp_window& window);
 void sp_shutdown();
@@ -280,18 +287,18 @@ void sp_init(const sp_window& window)
 		assert(SUCCEEDED(hr));
 	}
 
-	_sp._device = device;
-	_sp._swap_chain = swap_chain3;
-	_sp._back_buffer_index = swap_chain3->GetCurrentBackBufferIndex();
-	_sp._graphics_queue = graphics_queue;
-	_sp._compute_queue = compute_queue;
-	_sp._root_signature = root_signature;
+	detail::_sp._device = device;
+	detail::_sp._swap_chain = swap_chain3;
+	detail::_sp._back_buffer_index = swap_chain3->GetCurrentBackBufferIndex();
+	detail::_sp._graphics_queue = graphics_queue;
+	detail::_sp._compute_queue = compute_queue;
+	detail::_sp._root_signature = root_signature;
 
-	_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
-	_sp._descriptor_heap_rtv_cpu = sp_descriptor_heap_create("rtv_cpu", { 128, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::rtv });
-	_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 4096, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
-	_sp._descriptor_heap_cbv_srv_uav_cpu_transient = sp_descriptor_heap_create("cbv_srv_uav_cpu_transient", { 2048, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
-	_sp._descriptor_heap_cbv_srv_uav_gpu = sp_descriptor_heap_create("cbv_srv_uav_gpu", { 2048, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
+	detail::_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
+	detail::_sp._descriptor_heap_rtv_cpu = sp_descriptor_heap_create("rtv_cpu", { 128, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::rtv });
+	detail::_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 4096, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
+	detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient = sp_descriptor_heap_create("cbv_srv_uav_cpu_transient", { 2048, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
+	detail::_sp._descriptor_heap_cbv_srv_uav_gpu = sp_descriptor_heap_create("cbv_srv_uav_gpu", { 2048, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
 
 	detail::sp_texture_pool_create();
 	detail::sp_vertex_buffer_pool_create();
@@ -306,8 +313,8 @@ void sp_init(const sp_window& window)
 	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; ++back_buffer_index)
 	{
 		// TODO: sp_texture_create_from_swap_chain?
-		_sp._back_buffer_texture_handles[back_buffer_index] = detail::sp_texture_handle_alloc();
-		sp_texture& texture = detail::sp_texture_pool_get(_sp._back_buffer_texture_handles[back_buffer_index]);
+		detail::_sp._back_buffer_texture_handles[back_buffer_index] = detail::sp_texture_handle_alloc();
+		sp_texture& texture = detail::sp_texture_pool_get(detail::_sp._back_buffer_texture_handles[back_buffer_index]);
 
 		DXGI_SWAP_CHAIN_DESC1 swap_chain_desc;
 		hr = swap_chain3->GetDesc1(&swap_chain_desc);
@@ -322,21 +329,21 @@ void sp_init(const sp_window& window)
 		hr = swap_chain3->GetBuffer(back_buffer_index, IID_PPV_ARGS(&texture._resource));
 		assert(SUCCEEDED(hr));
 
-		texture._render_target_view = detail::sp_descriptor_alloc(&_sp._descriptor_heap_rtv_cpu);
+		texture._render_target_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_rtv_cpu);
 		device->CreateRenderTargetView(texture._resource.Get(), nullptr, texture._render_target_view._handle_cpu_d3d12);
 	}
 
-	_sp._descriptor_heap_debug_gui_gpu = sp_descriptor_heap_create("debug_gui_gpu", { 1024, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
+	detail::_sp._descriptor_heap_debug_gui_gpu = sp_descriptor_heap_create("debug_gui_gpu", { 1024, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
 
-	detail::sp_debug_gui_init(device.Get(), window, detail::sp_descriptor_alloc(&_sp._descriptor_heap_debug_gui_gpu));
+	detail::sp_debug_gui_init(device.Get(), window, detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_debug_gui_gpu));
 }
 
 void sp_shutdown()
 {
 	for (int back_buffer_index = 0; back_buffer_index < k_back_buffer_count; ++back_buffer_index)
 	{
-		sp_texture_destroy(_sp._back_buffer_texture_handles[back_buffer_index]);
-		_sp._back_buffer_texture_handles[back_buffer_index] = sp_texture_handle();
+		sp_texture_destroy(detail::_sp._back_buffer_texture_handles[back_buffer_index]);
+		detail::_sp._back_buffer_texture_handles[back_buffer_index] = sp_texture_handle();
 	}
 
 	detail::sp_texture_defaults_destroy();
@@ -349,17 +356,17 @@ void sp_shutdown()
 	detail::sp_vertex_shader_pool_destroy();
 	detail::sp_compute_shader_pool_destroy();
 
-	sp_descriptor_heap_destroy(&_sp._descriptor_heap_dsv_cpu);
-	sp_descriptor_heap_destroy(&_sp._descriptor_heap_rtv_cpu);
-	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_cpu);
-	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
-	sp_descriptor_heap_destroy(&_sp._descriptor_heap_cbv_srv_uav_gpu);
-	sp_descriptor_heap_destroy(&_sp._descriptor_heap_debug_gui_gpu);
+	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_dsv_cpu);
+	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_rtv_cpu);
+	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
+	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
+	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_debug_gui_gpu);
 
-	_sp._swap_chain.Reset();
-	_sp._graphics_queue.Reset();
-	_sp._compute_queue.Reset();
-	_sp._root_signature.Reset();
+	detail::_sp._swap_chain.Reset();
+	detail::_sp._graphics_queue.Reset();
+	detail::_sp._compute_queue.Reset();
+	detail::_sp._root_signature.Reset();
 
 #if SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED
 	{
@@ -371,15 +378,15 @@ void sp_shutdown()
 	}
 #endif
 
-	_sp._device.Reset();
+	detail::_sp._device.Reset();
 }
 
 void sp_graphics_queue_execute(const sp_graphics_command_list& command_list)
 {
 	ID3D12CommandList* command_lists_d3d12[] = { command_list._command_list_d3d12.Get() };
-	_sp._graphics_queue->ExecuteCommandLists(static_cast<UINT>(std::size(command_lists_d3d12)), command_lists_d3d12);
+	detail::_sp._graphics_queue->ExecuteCommandLists(static_cast<UINT>(std::size(command_lists_d3d12)), command_lists_d3d12);
 
-	_sp._graphics_queue->Signal(command_list._fences[command_list._back_buffer_index].Get(), command_list._fence_values[command_list._back_buffer_index]);
+	detail::_sp._graphics_queue->Signal(command_list._fences[command_list._back_buffer_index].Get(), command_list._fence_values[command_list._back_buffer_index]);
 }
 
 namespace detail
@@ -417,18 +424,18 @@ namespace detail
 
 void sp_graphics_queue_wait_for_idle()
 {
-	detail::sp_command_queue_wait_for_idle(_sp._graphics_queue.Get());
+	detail::sp_command_queue_wait_for_idle(detail::_sp._graphics_queue.Get());
 }
 
 void sp_compute_queue_execute(sp_compute_command_list& command_list)
 {
 	ID3D12CommandList* command_lists_d3d12[] = { command_list._command_list_d3d12.Get() };
-	_sp._compute_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
+	detail::_sp._compute_queue->ExecuteCommandLists(static_cast<unsigned>(std::size(command_lists_d3d12)), command_lists_d3d12);
 }
 
 void sp_compute_queue_wait_for_idle()
 {
-	detail::sp_command_queue_wait_for_idle(_sp._compute_queue.Get());
+	detail::sp_command_queue_wait_for_idle(detail::_sp._compute_queue.Get());
 }
 
 void sp_device_wait_for_idle()
@@ -439,8 +446,19 @@ void sp_device_wait_for_idle()
 
 void sp_swap_chain_present()
 {
-	HRESULT hr = _sp._swap_chain->Present(0, 0);
+	HRESULT hr = detail::_sp._swap_chain->Present(0, 0);
 	assert(SUCCEEDED(hr));
 
-	_sp._back_buffer_index = _sp._swap_chain->GetCurrentBackBufferIndex();
+	detail::_sp._back_buffer_index = detail::_sp._swap_chain->GetCurrentBackBufferIndex();
 }
+
+#if SP_HEADER_ONLY
+#include "command_list_impl.h"
+#include "constant_buffer_impl.h"
+#include "pipeline_impl.h"
+#include "texture_impl.h"
+#include "vertex_buffer_impl.h"
+#include "shader_impl.h"
+#include "descriptor_impl.h"
+#include "debug_gui_impl.h"
+#endif
