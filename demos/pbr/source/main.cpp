@@ -1100,7 +1100,7 @@ int main()
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, clouds_pipeline_state_handle);
 
 				sp_texture_handle clouds_render_target_handles[] = {
-					detail::_sp._back_buffer_texture_handles[_sp.back_buffer_index]
+					detail::_sp._back_buffer_texture_handles[detail::_sp._back_buffer_index]
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, clouds_render_target_handles, static_cast<int>(std::size(clouds_render_target_handles)), {});
 
