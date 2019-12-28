@@ -10,7 +10,7 @@
 
 #define DEMO_CLOUDS 0
 
-#include "sparky.h"
+#include <sparky/sparky.h>
 
 #include "../shaders/clouds.cbuffer.hlsli"
 #include "../shaders/lighting.cbuffer.hlsli"

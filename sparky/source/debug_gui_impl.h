@@ -2,15 +2,17 @@
 
 #include "window.h"
 #include "descriptor.h"
+#include "sparky.h"
 
-#include <imgui.h>
-#include <imgui.cpp>
-#include <imgui_draw.cpp>
-#include <imgui_widgets.cpp>
-#include <imgui_impl_win32.h>
-#include <imgui_impl_win32.cpp>
-#include <imgui_impl_dx12.h>
-#include <imgui_impl_dx12.cpp>
+// TODO: Best practice for adding header only library to header only library? Just throw it in the directory?
+#include "../../third_party/imgui/imgui.h"
+#include "../../third_party/imgui/imgui.cpp"
+#include "../../third_party/imgui/imgui_draw.cpp"
+#include "../../third_party/imgui/imgui_widgets.cpp"
+#include "../../third_party/imgui/imgui_impl_win32.h"
+#include "../../third_party/imgui/imgui_impl_win32.cpp"
+#include "../../third_party/imgui/imgui_impl_dx12.h"
+#include "../../third_party/imgui/imgui_impl_dx12.cpp"
 
 namespace detail
 {
@@ -21,7 +23,7 @@ namespace detail
 		ImGui::CreateContext();
 
 		ImGui_ImplWin32_Init(window._handle);
-		ImGui_ImplDX12_Init(device, 2, DXGI_FORMAT_R10G10B10A2_UNORM, _sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get(), font_descriptor_handle._handle_cpu_d3d12, font_descriptor_handle._handle_gpu_d3d12);
+		ImGui_ImplDX12_Init(device, 2, DXGI_FORMAT_R10G10B10A2_UNORM, detail::_sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get(), font_descriptor_handle._handle_cpu_d3d12, font_descriptor_handle._handle_gpu_d3d12);
 	}
 
 	void sp_debug_gui_shutdown()

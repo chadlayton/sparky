@@ -5,6 +5,12 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{6f9529dc-fbd2-43ef-9fd6-990b6d63be62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\sparky">
+      <UniqueIdentifier>{0c7a2b32-8221-454a-9037-86bb17e7cf1e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\command_list.h">
@@ -58,9 +64,6 @@
     <ClInclude Include="source\shader_impl.h">
       <Filter>source</Filter>
     </ClInclude>
-    <ClInclude Include="source\sparky.h">
-      <Filter>source</Filter>
-    </ClInclude>
     <ClInclude Include="source\texture.h">
       <Filter>source</Filter>
     </ClInclude>
@@ -76,10 +79,11 @@
     <ClInclude Include="source\window.h">
       <Filter>source</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="source\main.cpp">
+    <ClInclude Include="include\sparky\sparky.h">
+      <Filter>include\sparky</Filter>
+    </ClInclude>
+    <ClInclude Include="source\sparky.h">
       <Filter>source</Filter>
-    </ClCompile>
+    </ClInclude>
   </ItemGroup>
 </Project>

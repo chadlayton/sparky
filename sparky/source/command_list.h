@@ -1,6 +1,7 @@
 #pragma once
 
 #include "handle.h"
+#include "sparky.h"
 
 #include <array>
 
