@@ -300,13 +300,13 @@ void sp_init(const sp_window& window)
 		hr = swap_chain3->GetBuffer(back_buffer_index, IID_PPV_ARGS(&texture._resource));
 		assert(SUCCEEDED(hr));
 
-		texture._render_target_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_rtv_cpu);
+		texture._render_target_view = detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_rtv_cpu);
 		device->CreateRenderTargetView(texture._resource.Get(), nullptr, texture._render_target_view._handle_cpu_d3d12);
 	}
 
 	detail::_sp._descriptor_heap_debug_gui_gpu = sp_descriptor_heap_create("debug_gui_gpu", { 1024, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
 
-	detail::sp_debug_gui_init(device.Get(), window, detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_debug_gui_gpu));
+	detail::sp_debug_gui_init(device.Get(), window, detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_debug_gui_gpu));
 }
 
 void sp_shutdown()
@@ -327,12 +327,12 @@ void sp_shutdown()
 	detail::sp_vertex_shader_pool_destroy();
 	detail::sp_compute_shader_pool_destroy();
 
-	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_dsv_cpu);
-	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_rtv_cpu);
-	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
-	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
-	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
-	sp_descriptor_heap_destroy(&detail::_sp._descriptor_heap_debug_gui_gpu);
+	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_dsv_cpu);
+	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_rtv_cpu);
+	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
+	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
+	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_debug_gui_gpu);
 
 	detail::_sp._swap_chain.Reset();
 	detail::_sp._graphics_queue.Reset();

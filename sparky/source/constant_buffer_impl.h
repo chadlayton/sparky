@@ -1,10 +1,12 @@
 #pragma once
 
+#include "sparky.h"
 #include "constant_buffer.h"
 #include "descriptor.h"
 #include "d3dx12.h"
 
 #include <array>
+#include <cassert>
 
 #define NOMINMAX
 #include <d3d12.h>
@@ -49,11 +51,11 @@ void sp_constant_buffer_heap_destroy(sp_constant_buffer_heap* constant_buffer_he
 	constant_buffer_heap->_resource = nullptr;
 }
 
-sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_buffer_heap, int size_bytes, const void* initial_data)
+sp_descriptor_handle sp_constant_buffer_create(sp_constant_buffer_heap* constant_buffer_heap, int size_bytes, const void* initial_data)
 {
 	const int size_bytes_aligned = (size_bytes + 255) & ~255;
 
-	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 	D3D12_CONSTANT_BUFFER_VIEW_DESC constant_buffer_view_desc = {};
 	constant_buffer_view_desc.BufferLocation = constant_buffer_heap->_resource->GetGPUVirtualAddress() + constant_buffer_heap->_head;
@@ -76,4 +78,9 @@ sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_
 	constant_buffer_heap->_head += size_bytes_aligned;
 
 	return constant_buffer_view;
+}
+
+void sp_constant_buffer_update(sp_descriptor_handle constant_buffer, const void* data, int size_in_bytes)
+{
+
 }

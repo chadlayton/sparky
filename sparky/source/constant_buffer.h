@@ -26,4 +26,6 @@ void sp_constant_buffer_heap_reset(sp_constant_buffer_heap* constant_buffer_heap
 
 void sp_constant_buffer_heap_destroy(sp_constant_buffer_heap* constant_buffer_heap);
 
-sp_descriptor_handle sp_constant_buffer_alloc(sp_constant_buffer_heap* constant_buffer_heap, int size_bytes, const void* initial_data);
+sp_descriptor_handle sp_constant_buffer_create(sp_constant_buffer_heap* constant_buffer_heap, int size_bytes, const void* initial_data);
+
+void sp_constant_buffer_update(sp_descriptor_handle constant_buffer, const void* data, int size_in_bytes);

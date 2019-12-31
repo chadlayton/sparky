@@ -1,6 +1,6 @@
 #define SP_HEADER_ONLY 1
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
-#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 0
+#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
 #define SP_DEBUG_API_VALIDATION_LEVEL 1
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 #define SP_DEBUG_LIVE_SHADER_RELOADING 1
@@ -660,7 +660,7 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 
 		compute_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(texture._resource.Get()));
 
-		sp_descriptor_handle unordered_access_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+		sp_descriptor_handle unordered_access_view = detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		D3D12_UNORDERED_ACCESS_VIEW_DESC unordered_access_view_desc_d3d12 = {};
 		unordered_access_view_desc_d3d12.Format = detail::sp_texture_format_get_srv_format_d3d12(texture._format);
@@ -669,7 +669,7 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 
 		detail::_sp._device->CreateUnorderedAccessView(texture._resource.Get(), nullptr, &unordered_access_view_desc_d3d12, unordered_access_view._handle_cpu_d3d12);
 
-		sp_descriptor_handle shader_resource_view = detail::sp_descriptor_alloc(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+		sp_descriptor_handle shader_resource_view = detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC shader_resource_view_desc_d3d12 = {};
 		shader_resource_view_desc_d3d12.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -690,13 +690,13 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 
 		compute_command_list._command_list_d3d12->SetComputeRootDescriptorTable(0, sp_descriptor_heap_get_head(detail::_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 		sp_descriptor_copy_to_heap(
-			&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+			detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 			{
 				shader_resource_view,
 			});
 		compute_command_list._command_list_d3d12->SetComputeRootDescriptorTable(2, sp_descriptor_heap_get_head(detail::_sp._descriptor_heap_cbv_srv_uav_gpu)._handle_gpu_d3d12);
 		sp_descriptor_copy_to_heap(
-			&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+			detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 			{
 				unordered_access_view,
 			});
@@ -777,7 +777,7 @@ int main()
 			}
 		},
 		nullptr
-	);
+			);
 
 	sp_window window = sp_window_create("demo", { window_width, window_height });
 
@@ -827,7 +827,7 @@ int main()
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::back,
-	});
+		});
 
 	sp_graphics_pipeline_state_handle gbuffer_double_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer_double_sided", {
 		gbuffer_vertex_shader_handle,
@@ -845,7 +845,7 @@ int main()
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::none,
-	});
+		});
 
 	sp_compute_shader_handle low_freq_noise_shader_handle = sp_compute_shader_create({ "shaders/low_freq_noise.hlsl" });
 
@@ -873,7 +873,7 @@ int main()
 		{
 			sp_texture_format::r10g10b10a2,
 		},
-	});
+		});
 
 	//sp_file_watch_create("shaders/lighting.hlsl", [](const char* filepath) { 
 	//	std::cout << filepath << std::endl; 
@@ -881,7 +881,7 @@ int main()
 
 	// TODO: Be nicer if I could assign handles to the material. Better if I could not write completely custom callbacks. Maybe some rules like:
 	// material_override.create("MyMaterial").base_color_factor("Name", [](color* value) { value->r = 0; }).metalness(1.0).roughness(mul(3));
-	auto shader_ball_material_loaded_callback = [](const char* material_name, model::material* material, std::vector<const char*>* image_paths)  {
+	auto shader_ball_material_loaded_callback = [](const char* material_name, model::material* material, std::vector<const char*>* image_paths) {
 		if (strcmp(material_name, "Inside") == 0)
 		{
 			material->metalness_factor = 1.0;
@@ -906,15 +906,6 @@ int main()
 		material->base_color_factor = { 1.0f, 0.0f, 0.0f, 1.0f };
 	};
 
-	std::vector<std::pair<model, math::mat<4>>> entities{
-		//{ model_create_from_gltf("models/littlest_tokyo/scene.gltf", nullptr), math::create_rotation_x(-math::pi_div_2) },
-		//{ model_create_from_gltf("models/smashy_craft_city/scene.gltf", nullptr), math::create_rotation_x(0) },
-		//model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
-		//model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
-		//model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
-		{ model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
-	};
-
 	__declspec(align(16)) struct
 	{
 		math::mat<4> view_matrix;
@@ -931,10 +922,16 @@ int main()
 
 	} constant_buffer_per_frame_data;
 
+	sp_constant_buffer_heap constant_buffer_heap = sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
+
+	sp_descriptor_handle constant_buffer_per_frame = sp_constant_buffer_create(&constant_buffer_heap, sizeof(constant_buffer_per_frame_data), &constant_buffer_per_frame_data);
+
 	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
 	constant_buffer_lighting_per_frame_data lighting_per_frame_data;
 
-	sp_constant_buffer_heap constant_buffer_heap = sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
+	sp_descriptor_handle constant_buffer_per_frame_clouds = sp_constant_buffer_create(&constant_buffer_heap, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
+	sp_descriptor_handle constant_buffer_per_frame_lighting = sp_constant_buffer_create(&constant_buffer_heap, sizeof(constant_buffer_lighting_per_frame_data), &lighting_per_frame_data);
+
 
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
 	sp_compute_command_list compute_command_list = sp_compute_command_list_create("compute_command_list", {});
@@ -945,6 +942,70 @@ int main()
 	sp_texture_handle gbuffer_depth_texture_handle = sp_texture_create("gbuffer_depth", { window_width, window_height, 1, sp_texture_format::d32 });
 
 	math::vec<3> sun_direction_ws = math::normalize<3>({ 0.25f, -1.0f, -0.5f });
+
+	__declspec(align(16)) struct constant_buffer_per_object_data
+	{
+		math::mat<4> world_matrix;
+		math::vec<4> base_color_factor;
+		math::vec<4> metalness_roughness_factor;
+	};
+
+	struct entity
+	{
+		const model::material material;
+		const model::mesh mesh;
+		math::mat<4> transform;
+		sp_descriptor_table descriptor_table_srv;
+		sp_descriptor_table descriptor_table_cbv;
+	};
+
+	std::vector<entity> entities;
+
+	{
+		//model model = model_create_from_gltf("models/littlest_tokyo/scene.gltf", nullptr), math::create_rotation_x(-math::pi_div_2) },
+		//model model = model_create_from_gltf("models/smashy_craft_city/scene.gltf", nullptr), math::create_rotation_x(0) },
+		//model model = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
+		//model model = model_create_from_gltf("models/TextureCoordinateTest/TextureCoordinateTest.gltf", sp_texture_defaults_white(), sp_texture_defaults_white()),
+		//model model = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
+		//model model = model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
+
+		model model = model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback);
+		math::mat<4> transform = math::create_rotation_x(math::pi_div_2);
+		for (const auto& mesh : model.meshes)
+		{
+			const model::material& material = model.materials[mesh.material_index];
+
+			constant_buffer_per_object_data per_object_data{
+				transform,
+				{ material.base_color_factor[0], material.base_color_factor[1], material.base_color_factor[2], material.base_color_factor[3] },
+				{ material.metalness_factor, material.roughness_factor, 0.0f, 0.0f }
+			};
+
+			sp_descriptor_handle constant_buffer_per_object = sp_constant_buffer_create(&constant_buffer_heap, sizeof(constant_buffer_per_object_data), &per_object_data);
+
+			entity entity = {
+				material,
+				mesh,
+				transform,
+				sp_descriptor_table_create(
+					sp_descriptor_table_type::srv,
+					{
+						detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
+						detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
+					}
+				),
+				sp_descriptor_table_create(
+					sp_descriptor_table_type::cbv,
+					{
+						constant_buffer_per_frame,
+						constant_buffer_per_object
+					}
+				)
+			};
+
+			entities.push_back(entity);
+		}
+	}
 
 	while (sp_window_poll())
 	{
@@ -969,7 +1030,7 @@ int main()
 			sun_direction_ws = math::transform_vector(math::create_rotation_x(-0.1f), sun_direction_ws);
 		}
 
-		sp_descriptor_handle constant_buffer_per_frame;
+		//sp_descriptor_handle constant_buffer_per_frame;
 		{
 #ifdef JITTER_MATRIX
 			const math::vec<2> jitter_sample_pattern[] = {
@@ -998,12 +1059,10 @@ int main()
 			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 			constant_buffer_per_frame_data.camera_position_ws = camera.position;
 			constant_buffer_per_frame_data.sun_direction_ws = sun_direction_ws;
-
-			constant_buffer_per_frame = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_per_frame_data), &constant_buffer_per_frame_data);
 		}
 
-		sp_descriptor_handle constant_buffer_per_frame_clouds = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_clouds_per_frame_data), &clouds_per_frame_data);
-		sp_descriptor_handle constant_buffer_per_frame_lighting = sp_constant_buffer_alloc(&constant_buffer_heap, sizeof(constant_buffer_lighting_per_frame_data), &lighting_per_frame_data);
+
+		// TODO: update constant buffers
 
 		// Record all the commands we need to render the scene into the command list.
 		{
@@ -1034,6 +1093,25 @@ int main()
 
 				graphics_command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+				for (const auto& entity : entities)
+				{
+					if (entity.material.double_sided)
+					{
+						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_double_sided_pipeline_state_handle);
+					}
+					else
+					{
+						sp_graphics_command_list_set_pipeline_state(graphics_command_list, gbuffer_single_sided_pipeline_state_handle);
+					}
+
+					sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, entity.descriptor_table_srv);
+					sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, entity.descriptor_table_cbv);
+
+					sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &entity.mesh.vertex_buffer_handle, 1);
+					sp_graphics_command_list_draw_instanced(graphics_command_list, entity.mesh.vertex_count, 1);
+				}
+
+#if ENTITY_DEPRECATED
 				for (const std::pair<model, math::mat<4>>& entity : entities)
 				{
 					const auto& [model, transform] = entity;
@@ -1074,7 +1152,7 @@ int main()
 						// Copy SRV
 						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 						sp_descriptor_copy_to_heap(
-							&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+							detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
 								detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
 								detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
@@ -1082,7 +1160,7 @@ int main()
 						// Copy CBV
 						sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 						sp_descriptor_copy_to_heap(
-							&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+							detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 							{
 								constant_buffer_per_frame,
 								constant_buffer_per_object
@@ -1092,6 +1170,7 @@ int main()
 						sp_graphics_command_list_draw_instanced(graphics_command_list, mesh.vertex_count, 1);
 					}
 				}
+#endif
 			}
 
 #if DEMO_CLOUDS
@@ -1107,7 +1186,7 @@ int main()
 				// Copy SRV
 				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+					detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view,
 						detail::sp_texture_pool_get(cloud_shape_texture_handle)._shader_resource_view,
@@ -1117,7 +1196,7 @@ int main()
 				// Copy CBV
 				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+					detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						constant_buffer_per_frame,
 						constant_buffer_per_frame_clouds,
@@ -1126,6 +1205,7 @@ int main()
 			}
 #endif
 			
+
 #if !DEMO_CLOUDS
 			// lighting
 			{
@@ -1136,10 +1216,11 @@ int main()
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
 
+#if ENTITY_DEPRECATED
 				// Copy SRV
 				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+					detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view,
 						detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view,
@@ -1151,13 +1232,14 @@ int main()
 				// Copy CBV
 				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 				sp_descriptor_copy_to_heap(
-					&detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
+					detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
 					{
 						constant_buffer_per_frame,
 						constant_buffer_per_frame_lighting,
 					});
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
+#endif
 			}
 #endif
 
@@ -1181,6 +1263,7 @@ int main()
 				ImGui::DragFloat3("Direct Lighting", &constant_buffer_per_frame_data.sun_direction_ws[0]);
 			}
 			
+#if ENTITY_DEPRECATED
 			if (ImGui::CollapsingHeader("Materials"))
 			{
 				for (auto& entity : entities)
@@ -1210,6 +1293,7 @@ int main()
 					ImGui::PopID();
 				}
 			}
+#endif
 			ImGui::End();
 
 #if DEMO_CLOUDS
@@ -1258,10 +1342,10 @@ int main()
 
 		sp_swap_chain_present();
 
-		sp_descriptor_heap_reset(&detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
-		sp_descriptor_heap_reset(&detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+		sp_descriptor_heap_reset(detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
+		sp_descriptor_heap_reset(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
-		sp_constant_buffer_heap_reset(&constant_buffer_heap);
+		// sp_constant_buffer_heap_reset(&constant_buffer_heap);
 
 		++frame_num;
 

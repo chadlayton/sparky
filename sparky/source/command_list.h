@@ -75,7 +75,7 @@ void sp_graphics_command_list_clear_depth(sp_graphics_command_list& command_list
 void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_list, sp_texture_handle depth_stencil_handle);
 void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_list, int vertex_count, int instance_count);
 void sp_graphics_command_list_set_pipeline_state(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle);
-void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int slot, const sp_descriptor_heap& table); // TODO: sp_descriptor_table? Includes slot?
+void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int slot, const sp_descriptor_table& table); // TODO: sp_descriptor_table? Includes slot?
 void sp_graphics_command_list_end(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list);
 

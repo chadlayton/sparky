@@ -12,22 +12,106 @@
 
 namespace detail
 {
-	sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap* descriptor_heap, int descriptor_count)
+	sp_descriptor_handle sp_descriptor_alloc(sp_descriptor_heap& descriptor_heap, int descriptor_count)
 	{
 		assert(descriptor_count >= 0);
-		assert(descriptor_heap->_descriptor_count + descriptor_count < descriptor_heap->_descriptor_capacity);
+		assert(descriptor_heap._descriptor_count + descriptor_count < descriptor_heap._descriptor_capacity);
 
-		sp_descriptor_handle descriptor_handle = descriptor_heap->_head;
+		sp_descriptor_handle descriptor_handle = descriptor_heap._head;
 
-		const SIZE_T offset = static_cast<SIZE_T>(descriptor_heap->_descriptor_size) * descriptor_count;
+		const SIZE_T offset = static_cast<SIZE_T>(descriptor_heap._descriptor_size) * descriptor_count;
 
-		descriptor_heap->_head._handle_cpu_d3d12.ptr += offset;
-		descriptor_heap->_head._handle_gpu_d3d12.ptr += offset;
+		descriptor_heap._head._handle_cpu_d3d12.ptr += offset;
+		descriptor_heap._head._handle_gpu_d3d12.ptr += offset;
 
-		descriptor_heap->_descriptor_count += descriptor_count;
+		descriptor_heap._descriptor_count += descriptor_count;
 
 		return descriptor_handle;
 	}
+
+	void sp_descriptor_free(sp_descriptor_heap& descriptor_heap, sp_descriptor_handle* descriptors, int descriptor_count)
+	{
+		// TODO:
+	}
+
+	sp_descriptor_heap& sp_get_descriptor_heap_for_table_type(sp_descriptor_table_type type)
+	{
+		switch (type)
+		{
+		case sp_descriptor_table_type::cbv:
+		case sp_descriptor_table_type::srv:
+		case sp_descriptor_table_type::uav:
+			return detail::_sp._descriptor_heap_cbv_srv_uav_gpu;
+		case sp_descriptor_table_type::sampler:
+			// TODO:
+		default:
+			assert(false);
+			return detail::_sp._descriptor_heap_cbv_srv_uav_gpu;
+		}
+	}
+}
+
+sp_descriptor_table sp_descriptor_table_create(sp_descriptor_table_type type, int size_in_descriptors)
+{
+	assert(size_in_descriptors < SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX);
+
+	sp_descriptor_heap& heap = detail::sp_get_descriptor_heap_for_table_type(type);
+
+	sp_descriptor_table table = {
+		detail::sp_descriptor_alloc(heap, size_in_descriptors),
+		size_in_descriptors,
+		type
+	};
+
+	return table;
+}
+
+sp_descriptor_table sp_descriptor_table_create(sp_descriptor_table_type type, const sp_descriptor_handle* descriptors, int descriptor_count)
+{
+	sp_descriptor_table table = sp_descriptor_table_create(type, descriptor_count);
+	sp_descriptor_copy_to_table(table, descriptors, descriptor_count);
+	return table;
+}
+
+void sp_descriptor_copy_to_table(sp_descriptor_table& descriptor_table, const sp_descriptor_handle* descriptors, int descriptor_count)
+{
+	assert(descriptor_count < SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX);
+
+	// Our source descriptors are not expected to be congiguous in memory as required by 
+	// CopyDescriptorsSimple. To get the desired behavior we use the full CopyDescriptors
+	// function to copy from N ranges of 1 descriptor to 1 contiguous range of N descriptors
+
+	sp_descriptor_heap& heap = detail::sp_get_descriptor_heap_for_table_type(descriptor_table._type);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE source_descriptor_range_starts[SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX];
+	std::transform(descriptors, descriptors + descriptor_count, source_descriptor_range_starts, [](const sp_descriptor_handle& handle) { return handle._handle_cpu_d3d12;  });
+	UINT source_descriptor_range_sizes[SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX];
+	std::fill_n(source_descriptor_range_sizes, descriptor_count, 1);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE dest_descriptor_range_starts[1] = { descriptor_table._descriptor._handle_cpu_d3d12 };
+	const UINT dest_descriptor_range_sizes[1] = { static_cast<UINT>(descriptor_count) };
+	const UINT dest_descriptor_range_count = 1;
+
+#if _DEBUG
+	// TODO: Since we're filtering D3D12_MESSAGE_ID_COPY_DESCRIPTORS_INVALID_RANGES due to a bug 
+	// in the D3D12 debug layer, let's check for bad ranges ourselves.
+	for (int i = 0; i < descriptor_count; ++i)
+	{
+		for (int j = 0; j < descriptor_count; ++j)
+		{
+			assert(source_descriptor_range_starts[i].ptr != dest_descriptor_range_starts[j].ptr);
+		}
+	}
+#endif
+
+	detail::_sp._device->CopyDescriptors(
+		dest_descriptor_range_count,
+		dest_descriptor_range_starts,
+		dest_descriptor_range_sizes,
+		descriptor_count,
+		source_descriptor_range_starts,
+		source_descriptor_range_sizes,
+		heap._heap_d3d12->GetDesc().Type);
 }
 
 sp_descriptor_heap sp_descriptor_heap_create(const char* name, const sp_descriptor_heap_desc& desc)
@@ -66,15 +150,10 @@ sp_descriptor_heap sp_descriptor_heap_create(const char* name, const sp_descript
 	return descriptor_heap;
 }
 
-void sp_descriptor_heap_destroy(sp_descriptor_heap* descriptor_heap)
+void sp_descriptor_heap_reset(sp_descriptor_heap& descriptor_heap)
 {
-	descriptor_heap->_heap_d3d12.Reset();
-}
-
-void sp_descriptor_heap_reset(sp_descriptor_heap* descriptor_heap)
-{
-	descriptor_heap->_head = descriptor_heap->_base;
-	descriptor_heap->_descriptor_count = 0;
+	descriptor_heap._head = descriptor_heap._base;
+	descriptor_heap._descriptor_count = 0;
 }
 
 sp_descriptor_handle sp_descriptor_heap_get_head(const sp_descriptor_heap& descriptor_heap)
@@ -82,7 +161,12 @@ sp_descriptor_handle sp_descriptor_heap_get_head(const sp_descriptor_heap& descr
 	return descriptor_heap._head;
 }
 
-void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const sp_descriptor_handle* source_descriptors, int descriptor_count)
+void sp_descriptor_heap_destroy(sp_descriptor_heap& descriptor_heap)
+{
+	descriptor_heap._heap_d3d12.Reset();
+}
+
+void sp_descriptor_copy_to_heap(sp_descriptor_heap& dest_dscriptor_heap, const sp_descriptor_handle* source_descriptors, int descriptor_count)
 {
 	static const int SP_DESCRIPTOR_COPY_COUNT_MAX = 32;
 
@@ -120,5 +204,5 @@ void sp_descriptor_copy_to_heap(sp_descriptor_heap* dest_dscriptor_heap, const s
 		descriptor_count,
 		source_descriptor_range_starts,
 		source_descriptor_range_sizes,
-		dest_dscriptor_heap->_heap_d3d12->GetDesc().Type);
+		dest_dscriptor_heap._heap_d3d12->GetDesc().Type);
 }
