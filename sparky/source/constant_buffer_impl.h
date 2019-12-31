@@ -30,7 +30,7 @@ sp_constant_buffer_heap sp_constant_buffer_heap_create(const char* name, const s
 	assert(SUCCEEDED(hr));
 
 	constant_buffer_heap._head = 0;
-	constant_buffer_heap._size_bytes = size_bytes_aligned;
+	constant_buffer_heap._size_in_bytes = size_bytes_aligned;
 
 #if SP_DEBUG_RESOURCE_NAMING_ENABLED
 	constant_buffer_heap._resource->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
@@ -47,40 +47,43 @@ void sp_constant_buffer_heap_reset(sp_constant_buffer_heap* constant_buffer_heap
 void sp_constant_buffer_heap_destroy(sp_constant_buffer_heap* constant_buffer_heap)
 {
 	constant_buffer_heap->_head = 0;
-	constant_buffer_heap->_size_bytes = 0;
+	constant_buffer_heap->_size_in_bytes = 0;
 	constant_buffer_heap->_resource = nullptr;
 }
 
-sp_descriptor_handle sp_constant_buffer_create(sp_constant_buffer_heap* constant_buffer_heap, int size_bytes, const void* initial_data)
+sp_constant_buffer sp_constant_buffer_create(sp_constant_buffer_heap& constant_buffer_heap, int size_in_bytes)
 {
-	const int size_bytes_aligned = (size_bytes + 255) & ~255;
+	const int size_in_bytes_aligned = (size_in_bytes + 255) & ~255;
 
-	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
+	assert(constant_buffer_heap._head + size_in_bytes_aligned <= constant_buffer_heap._size_in_bytes);
 
-	D3D12_CONSTANT_BUFFER_VIEW_DESC constant_buffer_view_desc = {};
-	constant_buffer_view_desc.BufferLocation = constant_buffer_heap->_resource->GetGPUVirtualAddress() + constant_buffer_heap->_head;
-	constant_buffer_view_desc.SizeInBytes = size_bytes_aligned;
+	sp_descriptor_handle constant_buffer_view = detail::sp_descriptor_alloc(detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
 
-	assert(constant_buffer_heap->_head + size_bytes_aligned <= constant_buffer_heap->_size_bytes);
+	D3D12_CONSTANT_BUFFER_VIEW_DESC constant_buffer_view_desc = {
+		constant_buffer_heap._resource->GetGPUVirtualAddress() + constant_buffer_heap._head,
+		static_cast<UINT>(size_in_bytes_aligned)
+	};
 
 	detail::_sp._device->CreateConstantBufferView(&constant_buffer_view_desc, constant_buffer_view._handle_cpu_d3d12);
 
-	// TODO: This is probably dumb. Could map the buffer once per frame.
-	{
-		void* data_gpu;
-		CD3DX12_RANGE read_range(0, 0); // A range where end <= begin indicates we do not intend to read from this resource on the CPU.
-		HRESULT hr = constant_buffer_heap->_resource->Map(0, &read_range, &data_gpu);
-		assert(SUCCEEDED(hr));
-		memcpy(static_cast<uint8_t*>(data_gpu) + constant_buffer_heap->_head, initial_data, size_bytes);
-		constant_buffer_heap->_resource->Unmap(0, nullptr);
-	}
+	sp_constant_buffer constant_buffer = {
+		size_in_bytes,
+		constant_buffer_view,
+		constant_buffer_heap,
+		constant_buffer_heap._head
+	};
 
-	constant_buffer_heap->_head += size_bytes_aligned;
+	constant_buffer_heap._head += size_in_bytes_aligned;
 
-	return constant_buffer_view;
+	return constant_buffer;
 }
 
-void sp_constant_buffer_update(sp_descriptor_handle constant_buffer, const void* data, int size_in_bytes)
+void sp_constant_buffer_update(sp_constant_buffer& constant_buffer, const void* data)
 {
-
+	void* data_gpu;
+	CD3DX12_RANGE read_range(0, 0); // A range where end <= begin indicates we do not intend to read from this resource on the CPU.
+	HRESULT hr = constant_buffer._heap._resource->Map(0, &read_range, &data_gpu);
+	assert(SUCCEEDED(hr));
+	memcpy(static_cast<uint8_t*>(data_gpu) + constant_buffer._offset_in_heap, data, constant_buffer._size_in_bytes);
+	constant_buffer._heap._resource->Unmap(0, nullptr);
 }
