@@ -7,6 +7,7 @@
 
 struct sp_descriptor_handle;
 
+// TODO: move sp_constant_buffer_heap into private API
 struct sp_constant_buffer_heap_desc
 {
 	int size_bytes = 0;

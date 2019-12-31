@@ -958,15 +958,14 @@ int main()
 		math::vec<4> metalness_roughness_factor;
 	};
 
-	sp_constant_buffer constant_buffer_per_object = sp_constant_buffer_create(constant_buffer_heap, sizeof(constant_buffer_per_object_data));
-
 	struct entity
 	{
-		const model::material material;
-		const model::mesh mesh;
+		model::material material;
+		model::mesh mesh;
 		math::mat<4> transform;
 		sp_descriptor_table descriptor_table_srv;
 		sp_descriptor_table descriptor_table_cbv;
+		sp_constant_buffer constant_buffer_per_object;
 	};
 
 	std::vector<entity> entities;
@@ -991,6 +990,8 @@ int main()
 				{ material.metalness_factor, material.roughness_factor, 0.0f, 0.0f }
 			};
 
+			sp_constant_buffer constant_buffer_per_object = sp_constant_buffer_create(constant_buffer_heap, sizeof(constant_buffer_per_object_data));
+
 			entity entity = {
 				material,
 				mesh,
@@ -1008,7 +1009,8 @@ int main()
 						constant_buffer_per_frame._constant_buffer_view,
 						constant_buffer_per_object._constant_buffer_view
 					}
-				)
+				),
+				constant_buffer_per_object
 			};
 
 			entities.push_back(entity);
@@ -1098,7 +1100,7 @@ int main()
 
 				graphics_command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				for (const auto& entity : entities)
+				for (auto& entity : entities)
 				{
 					constant_buffer_per_object_data per_object_data{
 						entity.transform,
@@ -1106,7 +1108,7 @@ int main()
 						{ entity.material.metalness_factor, entity.material.roughness_factor, 0.0f, 0.0f }
 					};
 
-					sp_constant_buffer_update(constant_buffer_per_object, &per_object_data);
+					sp_constant_buffer_update(entity.constant_buffer_per_object, &per_object_data);
 
 					if (entity.material.double_sided)
 					{
@@ -1220,37 +1222,25 @@ int main()
 				ImGui::DragFloat3("Direct Lighting", &constant_buffer_per_frame_data.sun_direction_ws[0]);
 			}
 			
-#if ENTITY_DEPRECATED
 			if (ImGui::CollapsingHeader("Materials"))
 			{
 				for (auto& entity : entities)
 				{
 					ImGui::PushID(&entity);
 
-					auto& [model, transform] = entity;
-
-					ImGui::Text("%s", model.name);
-
-					for (auto& material : model.materials)
+					if (ImGui::TreeNode(entity.material.name))
 					{
-						ImGui::PushID(&material);
+						ImGui::ColorEdit3("Base Color", entity.material.base_color_factor.data());
+						ImGui::DragFloat("Metalness", &entity.material.metalness_factor, 0.01f, 0.0f, 1.0f);
+						ImGui::DragFloat("Roughness", &entity.material.roughness_factor, 0.01f, 0.0f, 1.0f);
 
-						if (ImGui::TreeNode(material.name))
-						{
-							ImGui::ColorEdit3("Base Color", material.base_color_factor.data());
-							ImGui::DragFloat("Metalness", &material.metalness_factor, 0.01f, 0.0f, 1.0f);
-							ImGui::DragFloat("Roughness", &material.roughness_factor, 0.01f, 0.0f, 1.0f);
-
-							ImGui::TreePop();
-						}
-
-						ImGui::PopID();
+						ImGui::TreePop();
 					}
 
 					ImGui::PopID();
 				}
 			}
-#endif
+
 			ImGui::End();
 
 #if DEMO_CLOUDS
