@@ -279,7 +279,7 @@ namespace detail
 	}
 }
 
-model model_create_from_gltf(const char* path, std::function<void(const char*, model::material*, std::vector<const char*>*)> on_material_created)
+model model_create_from_gltf(const char* path)
 {
 	const fx::gltf::ReadQuotas read_quotas_fx = {
 		fx::gltf::detail::DefaultMaxBufferCount,
@@ -875,35 +875,6 @@ int main()
 		},
 	});
 
-	// TODO: Be nicer if I could assign handles to the material. Better if I could not write completely custom callbacks. Maybe some rules like:
-	// material_override.create("MyMaterial").base_color_factor("Name", [](color* value) { value->r = 0; }).metalness(1.0).roughness(mul(3));
-	auto shader_ball_material_loaded_callback = [](const char* material_name, model::material* material, std::vector<const char*>* image_paths) {
-		if (strcmp(material_name, "Inside") == 0)
-		{
-			material->metalness_factor = 1.0;
-			material->roughness_factor = 1.0f;
-			material->base_color_factor = { 1.0f, 0.0f, 0.0f, 1.0f };
-		}
-		else if (strcmp(material_name, "Outside") == 0)
-		{
-			material->metalness_factor = 1.0;
-			material->roughness_factor = 0.0f;
-			material->base_color_factor = { 0.0f, 1.0f, 0.0f, 1.0f };
-		}
-		else if (strcmp(material_name, "Base") == 0)
-		{
-			material->metalness_factor = 0.0;
-			material->roughness_factor = 1.0f;
-			material->base_color_factor = { 0.0f, 0.0f, 1.0f, 1.0f };
-		}
-
-		material->metalness_factor = 1.0;
-		material->roughness_factor = 0.0f;
-		material->base_color_factor = { 1.0f, 0.0f, 0.0f, 1.0f };
-	};
-
-	sp_constant_buffer_heap constant_buffer_heap = sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
-
 	__declspec(align(16)) struct
 	{
 		math::mat<4> view_matrix;
@@ -920,7 +891,7 @@ int main()
 
 	} constant_buffer_per_frame_data;
 
-	sp_constant_buffer constant_buffer_per_frame = sp_constant_buffer_create(constant_buffer_heap, sizeof(constant_buffer_per_frame_data));
+	sp_constant_buffer constant_buffer_per_frame = sp_constant_buffer_create(sizeof(constant_buffer_per_frame_data));
 
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
 	sp_compute_command_list compute_command_list = sp_compute_command_list_create("compute_command_list", {});
@@ -933,8 +904,8 @@ int main()
 	constant_buffer_clouds_per_frame_data clouds_per_frame_data;
 	constant_buffer_lighting_per_frame_data lighting_per_frame_data;
 
-	sp_constant_buffer constant_buffer_per_frame_clouds = sp_constant_buffer_create(constant_buffer_heap, sizeof(constant_buffer_clouds_per_frame_data));
-	sp_constant_buffer constant_buffer_per_frame_lighting = sp_constant_buffer_create(constant_buffer_heap, sizeof(constant_buffer_lighting_per_frame_data));
+	sp_constant_buffer constant_buffer_per_frame_clouds = sp_constant_buffer_create(sizeof(constant_buffer_clouds_per_frame_data));
+	sp_constant_buffer constant_buffer_per_frame_lighting = sp_constant_buffer_create(sizeof(constant_buffer_lighting_per_frame_data));
 
 	sp_descriptor_table descriptor_table_lighting_srv = sp_descriptor_table_create(sp_descriptor_table_type::srv, {
 			detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view,
@@ -978,42 +949,84 @@ int main()
 		//model model = model_create_cube(sp_texture_defaults_checkerboard(), sp_texture_defaults_white()),
 		//model model = model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback), math::create_rotation_x(math::pi_div_2) },
 
-		model model = model_create_from_gltf("models/shader_ball/shader_ball.gltf", shader_ball_material_loaded_callback);
-		math::mat<4> transform = math::create_rotation_x(math::pi_div_2);
-		for (const auto& mesh : model.meshes)
 		{
-			const model::material& material = model.materials[mesh.material_index];
+			model model = model_create_from_gltf("models/shader_ball/shader_ball.gltf");
+			math::mat<4> transform = math::create_rotation_x(math::pi_div_2);
+			for (const auto& mesh : model.meshes)
+			{
+				const model::material& material = model.materials[mesh.material_index];
 
-			constant_buffer_per_object_data per_object_data{
-				transform,
-				{ material.base_color_factor[0], material.base_color_factor[1], material.base_color_factor[2], material.base_color_factor[3] },
-				{ material.metalness_factor, material.roughness_factor, 0.0f, 0.0f }
-			};
+				constant_buffer_per_object_data per_object_data{
+					transform,
+					{ material.base_color_factor[0], material.base_color_factor[1], material.base_color_factor[2], material.base_color_factor[3] },
+					{ material.metalness_factor, material.roughness_factor, 0.0f, 0.0f }
+				};
 
-			sp_constant_buffer constant_buffer_per_object = sp_constant_buffer_create(constant_buffer_heap, sizeof(constant_buffer_per_object_data));
+				sp_constant_buffer constant_buffer_per_object = sp_constant_buffer_create(sizeof(constant_buffer_per_object_data));
 
-			entity entity = {
-				material,
-				mesh,
-				transform,
-				sp_descriptor_table_create(
-					sp_descriptor_table_type::srv,
-					{
-						detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
-						detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
-					}
-				),
-				sp_descriptor_table_create(
-					sp_descriptor_table_type::cbv,
-					{
-						constant_buffer_per_frame._constant_buffer_view,
-						constant_buffer_per_object._constant_buffer_view
-					}
-				),
-				constant_buffer_per_object
-			};
+				entity entity = {
+					material,
+					mesh,
+					transform,
+					sp_descriptor_table_create(
+						sp_descriptor_table_type::srv,
+						{
+							detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
+							detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
+						}
+					),
+					sp_descriptor_table_create(
+						sp_descriptor_table_type::cbv,
+						{
+							constant_buffer_per_frame._constant_buffer_view,
+							constant_buffer_per_object._constant_buffer_view
+						}
+					),
+					constant_buffer_per_object
+				};
 
-			entities.push_back(entity);
+				entities.push_back(entity);
+			}
+		}
+
+		{
+			model model = model_create_from_gltf("models/MetalRoughSpheres/MetalRoughSpheres.gltf");
+			math::mat<4> transform = math::create_identity<4>();
+			for (const auto& mesh : model.meshes)
+			{
+				const model::material& material = model.materials[mesh.material_index];
+
+				constant_buffer_per_object_data per_object_data{
+					transform,
+					{ material.base_color_factor[0], material.base_color_factor[1], material.base_color_factor[2], material.base_color_factor[3] },
+					{ material.metalness_factor, material.roughness_factor, 0.0f, 0.0f }
+				};
+
+				sp_constant_buffer constant_buffer_per_object = sp_constant_buffer_create(sizeof(constant_buffer_per_object_data));
+
+				entity entity = {
+					material,
+					mesh,
+					transform,
+					sp_descriptor_table_create(
+						sp_descriptor_table_type::srv,
+						{
+							detail::sp_texture_pool_get(model.textures[material.base_color_texture_index])._shader_resource_view,
+							detail::sp_texture_pool_get(model.textures[material.metalness_roughness_texture_index])._shader_resource_view,
+						}
+					),
+					sp_descriptor_table_create(
+						sp_descriptor_table_type::cbv,
+						{
+							constant_buffer_per_frame._constant_buffer_view,
+							constant_buffer_per_object._constant_buffer_view
+						}
+					),
+					constant_buffer_per_object
+				};
+
+				entities.push_back(entity);
+			}
 		}
 	}
 

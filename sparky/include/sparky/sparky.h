@@ -265,6 +265,8 @@ void sp_init(const sp_window& window)
 	detail::_sp._compute_queue = compute_queue;
 	detail::_sp._root_signature = root_signature;
 
+	detail::_sp._constant_buffer_heap = detail::sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
+
 	detail::_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
 	detail::_sp._descriptor_heap_rtv_cpu = sp_descriptor_heap_create("rtv_cpu", { 128, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::rtv });
 	detail::_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 4096, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
@@ -326,6 +328,8 @@ void sp_shutdown()
 	detail::sp_pixel_shader_pool_destroy();
 	detail::sp_vertex_shader_pool_destroy();
 	detail::sp_compute_shader_pool_destroy();
+
+	detail::sp_constant_buffer_heap_destroy(detail::_sp._constant_buffer_heap);
 
 	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_dsv_cpu);
 	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_rtv_cpu);

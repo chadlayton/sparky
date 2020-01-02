@@ -3,6 +3,10 @@
 #include "descriptor.h"
 #include "texture.h"
 
+#include "descriptor.h"
+#include "constant_buffer.h"
+#include "texture.h"
+
 #define NOMINMAX
 #include <d3d12.h>
 #include <dxgi1_3.h>
@@ -35,6 +39,8 @@ namespace detail
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;
 
 		sp_texture_handle _back_buffer_texture_handles[k_back_buffer_count];
+
+		sp_constant_buffer_heap _constant_buffer_heap;
 
 	} _sp;
 }
