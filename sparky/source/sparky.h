@@ -1,9 +1,6 @@
 #pragma once
 
 #include "descriptor.h"
-#include "texture.h"
-
-#include "descriptor.h"
 #include "constant_buffer.h"
 #include "texture.h"
 
