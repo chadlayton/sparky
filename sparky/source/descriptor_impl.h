@@ -19,7 +19,7 @@ namespace detail
 
 		sp_descriptor_handle descriptor_handle = descriptor_heap._head;
 
-		const SIZE_T offset = static_cast<SIZE_T>(descriptor_heap._descriptor_size) * descriptor_count;
+		const SIZE_T offset = static_cast<SIZE_T>(descriptor_heap._descriptor_size)* descriptor_count;
 
 		descriptor_heap._head._handle_cpu_d3d12.ptr += offset;
 		descriptor_heap._head._handle_gpu_d3d12.ptr += offset;
@@ -33,7 +33,10 @@ namespace detail
 	{
 		// TODO:
 	}
+}
 
+namespace detail
+{
 	sp_descriptor_heap& sp_get_descriptor_heap_for_table_type(sp_descriptor_table_type type)
 	{
 		switch (type)
@@ -51,6 +54,7 @@ namespace detail
 	}
 }
 
+// TODO: Should a table be created with a specific root_parameter_index? I can't imagine ever wanting to bind a table to different ones.
 sp_descriptor_table sp_descriptor_table_create(sp_descriptor_table_type type, int size_in_descriptors)
 {
 	assert(size_in_descriptors < SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX);
@@ -73,6 +77,7 @@ sp_descriptor_table sp_descriptor_table_create(sp_descriptor_table_type type, co
 	return table;
 }
 
+// TODO: I think we're going to want multiple version of this. One for textures, buffers, constant buffers, samplers, etc. Will also allow additional validation against the table type.
 void sp_descriptor_copy_to_table(sp_descriptor_table& descriptor_table, const sp_descriptor_handle* descriptors, int descriptor_count)
 {
 	assert(descriptor_count < SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX);

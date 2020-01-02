@@ -247,9 +247,9 @@ void sp_graphics_command_list_set_pipeline_state(sp_graphics_command_list& comma
 	command_list._command_list_d3d12->SetPipelineState(detail::sp_graphics_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
 }
 
-void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int slot, const sp_descriptor_table& table)
+void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int root_parameter_index, const sp_descriptor_table& table)
 {
-	command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(slot, table._descriptor._handle_gpu_d3d12);
+	command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(root_parameter_index, table._descriptor._handle_gpu_d3d12);
 }
 
 void sp_graphics_command_list_end(sp_graphics_command_list& command_list)

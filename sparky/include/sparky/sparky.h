@@ -30,18 +30,6 @@
 
 struct sp_window;
 
-void sp_init(const sp_window& window);
-void sp_shutdown();
-
-void sp_graphics_queue_execute(const sp_graphics_command_list& command_list);
-void sp_graphics_queue_wait_for_idle();
-
-void sp_compute_queue_execute(const sp_compute_command_list& command_list);
-void sp_compute_queue_wait_for_idle();
-
-void sp_device_wait_for_idle();
-void sp_swap_chain_present();
-
 namespace detail
 {
 #if SP_DEBUG_RENDERDOC_HOOK_ENABLED
@@ -57,6 +45,16 @@ namespace detail
 	}
 #endif
 }
+
+struct sp_root_signature_parameter_desc
+{
+
+};
+
+struct sp_root_signature_desc
+{
+
+};
 
 void sp_init(const sp_window& window)
 {
