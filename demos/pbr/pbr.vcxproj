@@ -87,7 +87,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\chadl\source\repos\sparky\third_party\RenderDoc;$(SolutionDir)third_party\fx-gltf\include;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\stb;$(SolutionDir)sparky\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\RenderDoc;$(SolutionDir)third_party\fx-gltf\include;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\stb;$(SolutionDir)sparky\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -131,7 +131,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\chadl\source\repos\sparky\third_party\RenderDoc;$(SolutionDir)third_party\fx-gltf\include;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\stb;$(SolutionDir)sparky\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\RenderDoc;$(SolutionDir)third_party\fx-gltf\include;$(SolutionDir)third_party\json\single_include;$(SolutionDir)third_party\stb;$(SolutionDir)sparky\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>

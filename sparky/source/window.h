@@ -3,6 +3,12 @@
 #define NOMINMAX
 #include <windows.h>
 
+// TODO: Best practice for adding header only library to header only library? Just throw it in the directory?
+#include "../../third_party/imgui/imgui.h"
+#include "../../third_party/imgui/imgui_impl_dx12.h"
+
+IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 struct sp_window_desc
 {
 	int width, height;
@@ -73,16 +79,29 @@ void sp_window_event_set_resize_callback(sp_window_event_resize_cb on_resize, vo
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+	{
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+
 	switch (message)
 	{
 	case WM_SIZE:
 	{
+		ImGui_ImplDX12_InvalidateDeviceObjects();
+
 		const detail::sp_window_event_callbacks* callbacks = detail::sp_window_get_event_callbacks();
 		if (callbacks->on_resize)
 		{
 			(*callbacks->on_resize)(callbacks->on_resize_user_data, LOWORD(lParam), HIWORD(lParam));
+
+			ImGui_ImplDX12_CreateDeviceObjects();
+
 			return 0;
 		}
+
+		ImGui_ImplDX12_CreateDeviceObjects();
+		
 		break;
 	}
 	case WM_KEYDOWN:
@@ -214,6 +233,14 @@ sp_window sp_window_create(const char* name, const sp_window_desc& desc)
 	UpdateWindow(hWnd);
 
 	return { static_cast<void*>(hWnd) };
+}
+
+void sp_window_get_size(const sp_window& window, int* width, int* height)
+{
+	RECT rect;
+	GetClientRect(static_cast<HWND>(window._handle), &rect);
+	*width = (rect.right - rect.left);
+	*height = (rect.bottom - rect.top);
 }
 
 bool sp_window_poll()

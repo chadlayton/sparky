@@ -263,3 +263,8 @@ __pycache__/
 
 # Dear ImGui
 imgui.ini
+
+# Nsight Graphics
+*.nsight-gfxgpt
+*.nsight-gfxgpt.*
+*.nsight-gfxproj

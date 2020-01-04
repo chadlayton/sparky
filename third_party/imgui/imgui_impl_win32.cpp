@@ -199,7 +199,7 @@ static void ImGui_ImplWin32_UpdateGamepads()
         #undef MAP_ANALOG
     }
 }
-
+   
 void    ImGui_ImplWin32_NewFrame()
 {
     ImGuiIO& io = ImGui::GetIO();

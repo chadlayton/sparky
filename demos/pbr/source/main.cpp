@@ -1,7 +1,7 @@
 #define SP_HEADER_ONLY 1
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
 #define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
-#define SP_DEBUG_API_VALIDATION_LEVEL 1
+#define SP_DEBUG_API_VALIDATION_LEVEL 0
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 #define SP_DEBUG_LIVE_SHADER_RELOADING 1
 
@@ -727,28 +727,12 @@ int main()
 	sp_window_event_set_key_down_callback(
 		[](void* user_data, char key) {
 			static_cast<input::state*>(user_data)->keys[key] = true;
-
-			// TODO: Ugh. Would like debug_gui integration to be automatic.
-			int button = 0;
-			if (key == WM_LBUTTONDOWN) button = 0;
-			if (key == WM_RBUTTONDOWN) button = 1;
-			if (key == WM_MBUTTONDOWN) button = 2;
-			ImGui::GetIO().MouseDown[button] = true;
-			ImGui::GetIO().KeysDown[key] = true;
 		},
 		&input.current);
 
 	sp_window_event_set_key_up_callback(
 		[](void* user_data, char key) {
 			static_cast<input::state*>(user_data)->keys[key] = false;
-
-			// TODO: Ugh. Would like debug_gui integration to be automatic.
-			int button = 0;
-			if (key == WM_LBUTTONUP) button = 0;
-			if (key == WM_RBUTTONUP) button = 1;
-			if (key == WM_MBUTTONUP) button = 2;
-			ImGui::GetIO().MouseDown[button] = false;
-			ImGui::GetIO().KeysDown[key] = false;
 		},
 		&input.current);
 
@@ -762,22 +746,13 @@ int main()
 
 	sp_window_event_set_char_callback(
 		[](void* user_data, char key) {
-			if (ImGui::GetCurrentContext())
-			{
-				ImGui::GetIO().AddInputCharacter(key);
-			}
 		},
 		nullptr);
 
 	sp_window_event_set_resize_callback(
 		[](void* user_data, int width, int height) {
-			if (ImGui::GetCurrentContext())
-			{
-				ImGui::GetIO().DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
-			}
 		},
-		nullptr
-			);
+		nullptr);
 
 	sp_window window = sp_window_create("demo", { window_width, window_height });
 
@@ -1089,8 +1064,12 @@ int main()
 			sp_graphics_command_list_begin(graphics_command_list);
 			sp_compute_command_list_begin(compute_command_list);
 
-			sp_graphics_command_list_set_viewport(graphics_command_list, { 0.0f, 0.0f, window_width, window_height });
-			sp_graphics_command_list_set_scissor_rect(graphics_command_list, { 0, 0, window_width, window_height });
+			{
+				int width, height;
+				sp_window_get_size(window, &width, &height);
+				sp_graphics_command_list_set_viewport(graphics_command_list, { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height) });
+				sp_graphics_command_list_set_scissor_rect(graphics_command_list, { 0, 0, width, height });
+			}
 
 			{
 				sp_compute_command_list_set_pipeline_state(compute_command_list, low_freq_noise_pipeline_state_handle);
@@ -1099,6 +1078,8 @@ int main()
 
 			// gbuffer
 			{
+				graphics_command_list._command_list_d3d12->BeginEvent(1, "gbuffer", 8);
+
 				sp_texture_handle gbuffer_render_target_handles[] = {
 					gbuffer_base_color_texture_handle,
 					gbuffer_metalness_roughness_texture_handle,
@@ -1138,6 +1119,8 @@ int main()
 					sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &entity.mesh.vertex_buffer_handle, 1);
 					sp_graphics_command_list_draw_instanced(graphics_command_list, entity.mesh.vertex_count, 1);
 				}
+
+				graphics_command_list._command_list_d3d12->EndEvent();
 			}
 
 #if DEMO_CLOUDS
@@ -1176,6 +1159,8 @@ int main()
 #if !DEMO_CLOUDS
 			// lighting
 			{
+				graphics_command_list._command_list_d3d12->BeginEvent(1, "lighting", 9);
+
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
 
 				sp_texture_handle lighting_render_target_handles[] = {
@@ -1188,73 +1173,52 @@ int main()
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
 
-#if ENTITY_DEPRECATED
-				// Copy SRV
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
-				sp_descriptor_copy_to_heap(
-					detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
-					{
-						detail::sp_texture_pool_get(gbuffer_base_color_texture_handle)._shader_resource_view,
-						detail::sp_texture_pool_get(gbuffer_metalness_roughness_texture_handle)._shader_resource_view,
-						detail::sp_texture_pool_get(gbuffer_normals_texture_handle)._shader_resource_view,
-						detail::sp_texture_pool_get(gbuffer_depth_texture_handle)._shader_resource_view,
-						detail::sp_texture_pool_get(environment_specular_texture)._shader_resource_view,
-					});
-
-				// Copy CBV
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
-				sp_descriptor_copy_to_heap(
-					detail::_sp._descriptor_heap_cbv_srv_uav_gpu,
-					{
-						constant_buffer_per_frame,
-						constant_buffer_per_frame_lighting,
-					});
-
-				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
-#endif
+				graphics_command_list._command_list_d3d12->EndEvent();
 			}
 #endif
 
-			//sp_debug_gui_show_demo_window();
-			bool open = true;
-			int window_flags = 0;
-			ImGui::Begin("Demo", &open, window_flags);
+			{
+				//sp_debug_gui_show_demo_window();
+				bool open = true;
+				int window_flags = 0;
+				ImGui::Begin("Demo", &open, window_flags);
 
-			if (ImGui::CollapsingHeader("Camera"))
-			{
-				ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
-				ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
-				// TODO: Something is not right here e.g. <0,-1,0> is up
-				ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
-			}
-
-			if (ImGui::CollapsingHeader("Lighting"))
-			{
-				ImGui::DragInt("Sampling Method", &lighting_per_frame_data.sampling_method, 0.1f, 0, 2);
-				ImGui::DragFloat("Image Based Lighting Scale", &lighting_per_frame_data.image_based_lighting_scale, 0.01f, 0.0f, 10.0f);
-				ImGui::DragFloat3("Direct Lighting", &constant_buffer_per_frame_data.sun_direction_ws[0]);
-			}
-			
-			if (ImGui::CollapsingHeader("Materials"))
-			{
-				for (auto& entity : entities)
+				if (ImGui::CollapsingHeader("Camera"))
 				{
-					ImGui::PushID(&entity);
-
-					if (ImGui::TreeNode(entity.material.name))
-					{
-						ImGui::ColorEdit3("Base Color", entity.material.base_color_factor.data());
-						ImGui::DragFloat("Metalness", &entity.material.metalness_factor, 0.01f, 0.0f, 1.0f);
-						ImGui::DragFloat("Roughness", &entity.material.roughness_factor, 0.01f, 0.0f, 1.0f);
-
-						ImGui::TreePop();
-					}
-
-					ImGui::PopID();
+					ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
+					ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
+					// TODO: Something is not right here e.g. <0,-1,0> is up
+					ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
 				}
-			}
 
-			ImGui::End();
+				if (ImGui::CollapsingHeader("Lighting"))
+				{
+					ImGui::DragInt("Sampling Method", &lighting_per_frame_data.sampling_method, 0.1f, 0, 2);
+					ImGui::DragFloat("Image Based Lighting Scale", &lighting_per_frame_data.image_based_lighting_scale, 0.01f, 0.0f, 10.0f);
+					ImGui::DragFloat3("Direct Lighting", &constant_buffer_per_frame_data.sun_direction_ws[0]);
+				}
+
+				if (ImGui::CollapsingHeader("Materials"))
+				{
+					for (auto& entity : entities)
+					{
+						ImGui::PushID(&entity);
+
+						if (ImGui::TreeNode(entity.material.name))
+						{
+							ImGui::ColorEdit3("Base Color", entity.material.base_color_factor.data());
+							ImGui::DragFloat("Metalness", &entity.material.metalness_factor, 0.01f, 0.0f, 1.0f);
+							ImGui::DragFloat("Roughness", &entity.material.roughness_factor, 0.01f, 0.0f, 1.0f);
+
+							ImGui::TreePop();
+						}
+
+						ImGui::PopID();
+					}
+				}
+
+				ImGui::End();
+			}
 
 #if DEMO_CLOUDS
 			ImGui::Begin("Clouds", &open, window_flags);
@@ -1286,11 +1250,6 @@ int main()
 			ImGui::DragFloat("Debug3", &clouds_per_frame_data.debug3, 100.01f,  0.0f, 10000.0f);
 			ImGui::End();
 #endif
-
-			// TODO: This is dumb. The debug gui should probably share the same heap as the rest of our scene but for now we need a separate one
-			// since the default imgui implementation expects to be the only one using it.
-			ID3D12DescriptorHeap* descriptor_heaps2[] = { detail::_sp._descriptor_heap_debug_gui_gpu._heap_d3d12.Get() };
-			graphics_command_list._command_list_d3d12->SetDescriptorHeaps(static_cast<unsigned>(std::size(descriptor_heaps2)), descriptor_heaps2);
 
 			detail::sp_debug_gui_record_draw_commands(graphics_command_list);
 
