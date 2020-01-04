@@ -28,7 +28,6 @@ namespace detail
 		sp_descriptor_heap _descriptor_heap_rtv_cpu;
 		sp_descriptor_heap _descriptor_heap_dsv_cpu;
 		sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu;
-		sp_descriptor_heap _descriptor_heap_cbv_srv_uav_cpu_transient;
 		sp_descriptor_heap _descriptor_heap_cbv_srv_uav_gpu;
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> _root_signature;

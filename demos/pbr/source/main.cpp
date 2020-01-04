@@ -641,7 +641,7 @@ void* sp_image_volume_create_from_directory(const char* dirname, const char* for
 
 	return image_volume_data;
 }
-
+/*
 void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 {
 	const sp_texture& texture = detail::resource_pools::textures[texture_handle.index];
@@ -712,7 +712,7 @@ void sp_texture_generate_mipmaps(sp_texture_handle texture_handle)
 	}
 
 	sp_compute_command_list_destroy(compute_command_list);
-}
+}*/
 
 int main()
 {
@@ -780,7 +780,7 @@ int main()
 	const void* environment_specular_image_data = sp_image_create_from_file_hdr("environments/Factory_Catwalk/Factory_Catwalk_2k.hdr");
 	sp_texture_handle environment_specular_texture = sp_texture_create("environment_specular", { 2048, 1024, 1, sp_texture_format::r32g32b32a32, sp_texture_flags::none });
 	sp_texture_update(environment_specular_texture, environment_specular_image_data, 2048 * 1024 * 4 * 4, 4 * 4);
-	sp_texture_generate_mipmaps(environment_specular_texture);
+	//sp_texture_generate_mipmaps(environment_specular_texture);
 
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
@@ -1260,8 +1260,6 @@ int main()
 		sp_graphics_queue_execute(graphics_command_list);
 
 		sp_swap_chain_present();
-
-		sp_descriptor_heap_reset(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 
 		++frame_num;
 

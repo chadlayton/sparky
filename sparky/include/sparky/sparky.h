@@ -265,11 +265,10 @@ void sp_init(const sp_window& window)
 
 	detail::_sp._constant_buffer_heap = detail::sp_constant_buffer_heap_create("constant_buffer_heap", { 32 * 1024 });
 
-	detail::_sp._descriptor_heap_dsv_cpu = sp_descriptor_heap_create("dsv_cpu", { 16, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::dsv });
-	detail::_sp._descriptor_heap_rtv_cpu = sp_descriptor_heap_create("rtv_cpu", { 128, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::rtv });
-	detail::_sp._descriptor_heap_cbv_srv_uav_cpu = sp_descriptor_heap_create("cbv_srv_uav_cpu", { 4096, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
-	detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient = sp_descriptor_heap_create("cbv_srv_uav_cpu_transient", { 2048, sp_descriptor_heap_visibility::cpu_only, sp_descriptor_heap_type::cbv_srv_uav });
-	detail::_sp._descriptor_heap_cbv_srv_uav_gpu = sp_descriptor_heap_create("cbv_srv_uav_gpu", { 2048, sp_descriptor_heap_visibility::cpu_and_gpu, sp_descriptor_heap_type::cbv_srv_uav });
+	detail::_sp._descriptor_heap_dsv_cpu = detail::sp_descriptor_heap_create("dsv_cpu", { 16, detail::sp_descriptor_heap_visibility::cpu_only, detail::sp_descriptor_heap_type::dsv });
+	detail::_sp._descriptor_heap_rtv_cpu = detail::sp_descriptor_heap_create("rtv_cpu", { 128, detail::sp_descriptor_heap_visibility::cpu_only, detail::sp_descriptor_heap_type::rtv });
+	detail::_sp._descriptor_heap_cbv_srv_uav_cpu = detail::sp_descriptor_heap_create("cbv_srv_uav_cpu", { 4096, detail::sp_descriptor_heap_visibility::cpu_only, detail::sp_descriptor_heap_type::cbv_srv_uav });
+	detail::_sp._descriptor_heap_cbv_srv_uav_gpu = detail::sp_descriptor_heap_create("cbv_srv_uav_gpu", { 2048, detail::sp_descriptor_heap_visibility::cpu_and_gpu, detail::sp_descriptor_heap_type::cbv_srv_uav });
 
 	detail::sp_texture_pool_create();
 	detail::sp_vertex_buffer_pool_create();
@@ -330,7 +329,6 @@ void sp_shutdown()
 	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_dsv_cpu);
 	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_rtv_cpu);
 	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_cbv_srv_uav_cpu);
-	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_cbv_srv_uav_cpu_transient);
 	sp_descriptor_heap_destroy(detail::_sp._descriptor_heap_cbv_srv_uav_gpu);
 
 	detail::_sp._swap_chain.Reset();
