@@ -1,5 +1,8 @@
 #pragma once
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #include "..\..\source\handle.h"
 #include "..\..\source\window.h"
 #include "..\..\source\vertex_buffer.h"
@@ -12,6 +15,7 @@
 #include "..\..\source\math.h"
 #include "..\..\source\debug_gui.h"
 #include "..\..\source\file_watch.h"
+#include "..\..\source\image.h"
 
 #include "..\..\source\d3dx12.h"
 

@@ -32,6 +32,7 @@
     <ClInclude Include="source\file_watch.h" />
     <ClInclude Include="source\frame_graph.h" />
     <ClInclude Include="source\handle.h" />
+    <ClInclude Include="source\image.h" />
     <ClInclude Include="source\math.h" />
     <ClInclude Include="source\pipeline.h" />
     <ClInclude Include="source\pipeline_impl.h" />

@@ -85,5 +85,8 @@
     <ClInclude Include="source\sparky.h">
       <Filter>source</Filter>
     </ClInclude>
+    <ClInclude Include="source\image.h">
+      <Filter>source</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
