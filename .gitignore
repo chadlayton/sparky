@@ -268,3 +268,6 @@ imgui.ini
 *.nsight-gfxgpt
 *.nsight-gfxgpt.*
 *.nsight-gfxproj
+
+# RenderDoc
+renderdoc.dll

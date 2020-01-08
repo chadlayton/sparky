@@ -23,6 +23,12 @@ enum class sp_rasterizer_cull_face
 	none,
 };
 
+enum class sp_rasterizer_fill_mode
+{
+	solid,
+	wireframe
+};
+
 struct sp_graphics_pipeline_state_desc
 {
 	sp_vertex_shader_handle vertex_shader_handle;
@@ -31,6 +37,7 @@ struct sp_graphics_pipeline_state_desc
 	sp_texture_format render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
 	sp_texture_format depth_stencil_format = sp_texture_format::unknown;
 	sp_rasterizer_cull_face cull_face = sp_rasterizer_cull_face::back;
+	sp_rasterizer_fill_mode fill_mode = sp_rasterizer_fill_mode::solid;
 };
 
 struct sp_compute_pipeline_state_desc
@@ -58,14 +65,16 @@ using sp_compute_pipeline_state_handle = sp_handle;
 namespace detail
 {
 	void sp_graphics_pipeline_state_pool_create();
-	void sp_compute_pipeline_state_pool_create();
-	void sp_graphics_pipeline_state_pool_destroy();
-	void sp_compute_pipeline_state_pool_destroy();
 	sp_graphics_pipeline_state& sp_graphics_pipeline_state_pool_get(const sp_graphics_pipeline_state_handle& pipeline_handle);
+	void sp_graphics_pipeline_state_pool_destroy();
+
+	void sp_compute_pipeline_state_pool_destroy();
 	sp_compute_pipeline_state& sp_compute_pipeline_state_pool_get(const sp_compute_pipeline_state_handle& pipeline_handle);
+	void sp_compute_pipeline_state_pool_create();
 }
 
 sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* name, const sp_graphics_pipeline_state_desc& desc);
-sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc);
 void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle);
+
+sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc);
 void sp_compute_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle);

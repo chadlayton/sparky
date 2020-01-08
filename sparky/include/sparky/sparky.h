@@ -222,14 +222,17 @@ void sp_init(const sp_window& window)
 		range_srv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 12, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 		CD3DX12_DESCRIPTOR_RANGE1 range_cbv;
 		range_cbv.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
+		CD3DX12_DESCRIPTOR_RANGE1 range_cbv2;
+		range_cbv2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 6, 6, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 		CD3DX12_DESCRIPTOR_RANGE1 range_uav;
 		range_uav.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
 		// TODO: Hardcoded
-		CD3DX12_ROOT_PARAMETER1 root_parameters[3];
+		CD3DX12_ROOT_PARAMETER1 root_parameters[4];
 		root_parameters[0].InitAsDescriptorTable(1, &range_srv, D3D12_SHADER_VISIBILITY_ALL);
 		root_parameters[1].InitAsDescriptorTable(1, &range_cbv, D3D12_SHADER_VISIBILITY_ALL);
 		root_parameters[2].InitAsDescriptorTable(1, &range_uav, D3D12_SHADER_VISIBILITY_ALL);
+		root_parameters[3].InitAsDescriptorTable(1, &range_cbv2, D3D12_SHADER_VISIBILITY_ALL);
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;

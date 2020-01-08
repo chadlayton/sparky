@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sparky.h"
 #include "pipeline.h"
 #include "handle.h"
 #include "texture.h"
@@ -29,9 +30,9 @@ namespace detail
 		sp_handle_pool_create(&resource_pools::graphics_pipeline_handles, static_cast<int>(resource_pools::graphics_pipelines.size()));
 	}
 
-	void sp_compute_pipeline_state_pool_create()
+	sp_graphics_pipeline_state& sp_graphics_pipeline_state_pool_get(const sp_graphics_pipeline_state_handle& pipeline_handle)
 	{
-		sp_handle_pool_create(&resource_pools::compute_pipeline_handles, static_cast<int>(resource_pools::compute_pipelines.size()));
+		return detail::resource_pools::graphics_pipelines[pipeline_handle.index];
 	}
 
 	void sp_graphics_pipeline_state_pool_destroy()
@@ -39,14 +40,9 @@ namespace detail
 		sp_handle_pool_destroy(&resource_pools::graphics_pipeline_handles);
 	}
 
-	void sp_compute_pipeline_state_pool_destroy()
+	void sp_compute_pipeline_state_pool_create()
 	{
-		sp_handle_pool_destroy(&resource_pools::compute_pipeline_handles);
-	}
-
-	sp_graphics_pipeline_state& sp_graphics_pipeline_state_pool_get(const sp_graphics_pipeline_state_handle& pipeline_handle)
-	{
-		return detail::resource_pools::graphics_pipelines[pipeline_handle.index];
+		sp_handle_pool_create(&resource_pools::compute_pipeline_handles, static_cast<int>(resource_pools::compute_pipelines.size()));
 	}
 
 	sp_compute_pipeline_state& sp_compute_pipeline_state_pool_get(const sp_compute_pipeline_state_handle& pipeline_handle)
@@ -54,6 +50,14 @@ namespace detail
 		return detail::resource_pools::compute_pipelines[pipeline_handle.index];
 	}
 
+	void sp_compute_pipeline_state_pool_destroy()
+	{
+		sp_handle_pool_destroy(&resource_pools::compute_pipeline_handles);
+	}
+}
+
+namespace detail
+{
 	void sp_graphics_pipeline_state_init(const char* name, const sp_graphics_pipeline_state_desc& desc, sp_graphics_pipeline_state* pipeline_state)
 	{
 		// TODO: Deduce from vertex shader reflection data?
@@ -91,6 +95,12 @@ namespace detail
 			case sp_rasterizer_cull_face::front: pipeline_state_desc_d3d12.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT; break;
 			case sp_rasterizer_cull_face::back:  pipeline_state_desc_d3d12.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;  break;
 			case sp_rasterizer_cull_face::none:  pipeline_state_desc_d3d12.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  break;
+			default: assert(false);
+			}
+			switch (desc.fill_mode)
+			{
+			case sp_rasterizer_fill_mode::solid:     pipeline_state_desc_d3d12.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;     break;
+			case sp_rasterizer_fill_mode::wireframe: pipeline_state_desc_d3d12.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME; break;
 			default: assert(false);
 			}
 			pipeline_state_desc_d3d12.RasterizerState.FrontCounterClockwise = TRUE;
@@ -171,6 +181,16 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 	return pipeline_state_handle;
 }
 
+void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle)
+{
+	sp_graphics_pipeline_state& pipeline_state = detail::resource_pools::graphics_pipelines[pipeline_state_handle.index];
+
+	pipeline_state._name = nullptr;
+	pipeline_state._impl.Reset();
+
+	sp_handle_free(&detail::resource_pools::graphics_pipeline_handles, pipeline_state_handle);
+}
+
 sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc)
 {
 	sp_compute_pipeline_state_handle pipeline_state_handle = sp_handle_alloc(&detail::resource_pools::compute_pipeline_handles);
@@ -190,16 +210,6 @@ sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* na
 	pipeline_state._desc = desc;
 
 	return pipeline_state_handle;
-}
-
-void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle)
-{
-	sp_graphics_pipeline_state& pipeline_state = detail::resource_pools::graphics_pipelines[pipeline_state_handle.index];
-
-	pipeline_state._name = nullptr;
-	pipeline_state._impl.Reset();
-
-	sp_handle_free(&detail::resource_pools::graphics_pipeline_handles, pipeline_state_handle);
 }
 
 void sp_compute_pipeline_state_destroy(const sp_graphics_pipeline_state_handle& pipeline_state_handle)

@@ -9,8 +9,8 @@
 
 struct sp_vertex_buffer_desc
 {
-	int _size_bytes = -1;
-	int _stride_bytes = -1;
+	int _size_in_bytes = -1;
+	int _stride_in_bytes = -1;
 };
 
 struct sp_vertex_buffer
@@ -30,6 +30,5 @@ namespace detail
 }
 
 sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_vertex_buffer_desc& desc);
-ID3D12Resource* sp_vertex_buffer_get_impl(const sp_vertex_buffer_handle& buffer_handle);
 void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, const void* data_cpu, int size_bytes);
 void sp_vertex_buffer_destroy(const sp_vertex_buffer_handle& buffer_handle);

@@ -1,18 +1,22 @@
-# Framework
-- [ ] RenderDoc integration
-- [ ] Investigate render pass abstraction
-- [ ] Automatic scheduling for 2+ in flight frames
-- [ ] Support for compute shaders
-- [ ] Fix shutdown leaks
-- [ ] Build as (header only) library
-- [ ] Investigate slang
-- [ ] glTF
-- [ ] Debug GUI
-
 # Demos
 - [ ] Hello, world!
 - [ ] PBR
 - [ ] Clouds
+- [ ] Water
+- [ ] Terrain
+
+# Ideas
+
+1. A shader compiler that makes it easy to expose and attach shader constants to debug gui and share structs.
+
+struct my_constants
+{
+	float foo; // @sp_debug(min=0.0, max=0.0, slider=true)
+};
+
+Are there any existing tools for dealing with SAS other than the deprecated Effects framework?
+
+2. 
 
 # Assets
 - https://developer.nvidia.com/ue4-sun-temple

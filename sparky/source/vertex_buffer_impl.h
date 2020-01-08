@@ -44,7 +44,7 @@ sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_verte
 	hr = detail::_sp._device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(desc._size_bytes),
+		&CD3DX12_RESOURCE_DESC::Buffer(desc._size_in_bytes),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&buffer._resource));
@@ -57,15 +57,10 @@ sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_verte
 #endif
 
 	buffer._vertex_buffer_view.BufferLocation = buffer._resource->GetGPUVirtualAddress();
-	buffer._vertex_buffer_view.StrideInBytes = desc._stride_bytes;
-	buffer._vertex_buffer_view.SizeInBytes = desc._size_bytes;
+	buffer._vertex_buffer_view.StrideInBytes = desc._stride_in_bytes;
+	buffer._vertex_buffer_view.SizeInBytes = desc._size_in_bytes;
 
 	return buffer_handle;
-}
-
-ID3D12Resource* sp_vertex_buffer_get_impl(const sp_vertex_buffer_handle& buffer_handle)
-{
-	return detail::resource_pools::vertex_buffers[buffer_handle.index]._resource.Get();
 }
 
 void sp_vertex_buffer_update(const sp_vertex_buffer_handle& buffer_handle, const void* data_cpu, int size_bytes)
