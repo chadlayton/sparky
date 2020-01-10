@@ -153,18 +153,18 @@ struct vs_output
 
 vs_output vs_main(vs_input input)
 {
+    float4x4 world_view_projection_matrix = mul(world_matrix, view_projection_matrix);
+
     float3 position_os = input.position_os;
 
-    float3 signal = snoise_grad(position_os.xz);
+    float3 signal = snoise_grad(position_os.xz * 0.1);
 
     position_os.y = signal.z;
 
-	float4x4 world_view_projection_matrix = mul(world_matrix, view_projection_matrix);
+    vs_output output;
 
-	vs_output output;
-
-	output.position_cs = mul(float4(position_os, 1.0f), world_view_projection_matrix);
-    output.normal_ws = float3(signal.x, 1.0, signal.y);
+    output.position_cs = mul(float4(position_os, 1.0), world_view_projection_matrix);
+    output.normal_ws = mul(float4(signal.x, 1.0, signal.y, 0.0f), world_matrix).xyz;
 
 	return output;
 }

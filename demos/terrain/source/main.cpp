@@ -197,7 +197,7 @@ void* sp_vertex_data_get_plane(int* size_in_bytes, int* stride_in_bytes)
 		}
 	}
 
-	*size_in_bytes = sizeof(vertex) * vertices.size();
+	*size_in_bytes = sizeof(vertex) * static_cast<int>(vertices.size());
 	*stride_in_bytes = sizeof(vertex);
 
 	return vertices.data();
@@ -306,10 +306,10 @@ int main()
 
 	sp_constant_buffer constant_buffer_per_frame = sp_constant_buffer_create(sizeof(constant_buffer_per_frame_data));
 
-	sp_descriptor_handle constant_buffer_descriptors_cbv[] = {
+	sp_descriptor_handle constant_buffer_descriptors_per_frame_cbv[] = {
 		constant_buffer_per_frame._constant_buffer_view
 	};
-	sp_descriptor_table descriptor_table_per_frame_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_cbv);
+	sp_descriptor_table descriptor_table_per_frame_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_per_frame_cbv);
 
 	__declspec(align(16)) struct constant_buffer_per_draw_terrain_data
 	{
@@ -327,7 +327,7 @@ int main()
 	sp_descriptor_handle constant_buffer_descriptors_per_draw_terrain_cbv[] = {
 		constant_buffer_per_draw_terrain._constant_buffer_view
 	};
-	sp_descriptor_table descriptor_table_terrain_per_draw_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_cbv);
+	sp_descriptor_table descriptor_table_terrain_per_draw_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_per_draw_terrain_cbv);
 
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
 
@@ -400,8 +400,13 @@ int main()
 				int window_flags = 0;
 				ImGui::Begin("Demo", &open, window_flags);
 
-				if (ImGui::CollapsingHeader("Terrain"))
+
+				if (ImGui::CollapsingHeader("Camera"))
 				{
+					ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x, camera.position.y, camera.position.z);
+					ImGui::Text("Rotation: %.1f, %.1f, %.1f", camera.rotation.x, camera.rotation.y, camera.rotation.z);
+					// TODO: Something is not right here e.g. <0,-1,0> is up
+					ImGui::Text("Forward:  %.3f, %.3f, %.3f", math::get_forward(camera_get_transform(camera)).x, math::get_forward(camera_get_transform(camera)).y, math::get_forward(camera_get_transform(camera)).z);
 				}
 
 				ImGui::End();
