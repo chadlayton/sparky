@@ -1,4 +1,5 @@
-SamplerState default_sampler : register(s0);
+Texture2D terrain_virtual_texture : register(t0);
+SamplerState linear_clamp : register(s0);
 
 float3 mod289(float3 x)
 {
@@ -149,6 +150,7 @@ struct vs_output
 {
 	float4 position_cs : SV_Position;
     float3 normal_ws : NORMAL;
+    float2 texcoord : TEXCOORD;
 };
 
 vs_output vs_main(vs_input input)
@@ -165,6 +167,7 @@ vs_output vs_main(vs_input input)
 
     output.position_cs = mul(float4(position_os, 1.0), world_view_projection_matrix);
     output.normal_ws = mul(float4(signal.x, 1.0, signal.y, 0.0f), world_matrix).xyz;
+    output.texcoord = position_os.xz * 0.01;
 
 	return output;
 }
@@ -173,9 +176,12 @@ struct ps_input
 {
 	float4 position_ss : SV_Position;
     float3 normal_ws : NORMAL;
+    float2 texcoord : TEXCOORD;
 };
 
 float4 ps_main(ps_input input) : SV_Target0
 {
-    return dot(normalize(input.normal_ws), float3(0.0, 1.0, 0.0));
+    float4 color = terrain_virtual_texture.SampleLevel(linear_clamp, input.texcoord, 0);
+
+    return color * dot(normalize(input.normal_ws), float3(0.0, 1.0, 0.0));
 }

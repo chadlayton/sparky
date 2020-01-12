@@ -83,6 +83,35 @@
   <ItemGroup>
     <ClCompile Include="source\main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\brdf.hlsli" />
+    <None Include="shaders\clouds.cbuffer.hlsli" />
+    <None Include="shaders\fullscreen_triangle.hlsli" />
+    <None Include="shaders\gamma_correction.hlsli" />
+    <None Include="shaders\intersect.hlsli" />
+    <None Include="shaders\lighting.cbuffer.hlsli" />
+    <None Include="shaders\noise.hlsli" />
+    <None Include="shaders\per_frame_cbuffer.hlsli" />
+    <None Include="shaders\position_from_depth.hlsli" />
+    <None Include="shaders\tonemap.hlsli" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\clouds.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\gbuffer.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\generate_mipmaps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\lighting.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\low_freq_noise.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

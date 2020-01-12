@@ -164,7 +164,6 @@ void* sp_vertex_data_get_plane(int* size_in_bytes, int* stride_in_bytes)
 
 	static std::vector<vertex> vertices;
 
-
 	for (int y = 1; y < 128 - 1; ++y)
 	{
 		for (int x = 1; x < 128 - 1; ++x)
@@ -277,18 +276,17 @@ int main()
 		sp_pixel_shader_create({ "shaders/terrain.hlsl" }),
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT }
 		},
 		{
-			sp_texture_format::r10g10b10a2,
-			sp_texture_format::r10g10b10a2,
 			sp_texture_format::r10g10b10a2,
 		},
 		sp_texture_format::d32,
 		sp_rasterizer_cull_face::back,
 		sp_rasterizer_fill_mode::solid,
+	});
+
+	sp_compute_pipeline_state_handle terrain_virtual_texture_pipeline_state = sp_compute_pipeline_state_create("terrain_virtual_texture", { 
+		sp_compute_shader_create({ "shaders/terrain_virtual_texture.hlsl" })
 	});
 
 	__declspec(align(16)) struct
@@ -311,16 +309,44 @@ int main()
 	};
 	sp_descriptor_table descriptor_table_per_frame_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_per_frame_cbv);
 
+	const void* terrain_dirt_image_data = sp_image_create_from_file("textures/dirt.png");
+	sp_texture_handle terrain_dirt_texture = sp_texture_create("dirt", { 1024, 1024, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
+	sp_texture_update(terrain_dirt_texture, terrain_dirt_image_data, 1024 * 1024 * 4, 4);
+
+	const void* terrain_grass_image_data = sp_image_create_from_file("textures/grass.png");
+	sp_texture_handle terrain_grass_texture = sp_texture_create("grass", { 1024, 1024, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
+	sp_texture_update(terrain_grass_texture, terrain_dirt_image_data, 1024 * 1024 * 4, 4);
+
+	const void* terrain_rock_image_data = sp_image_create_from_file("textures/rock.png");
+	sp_texture_handle terrain_rock_texture = sp_texture_create("rock", { 1024, 1024, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
+	sp_texture_update(terrain_rock_texture, terrain_dirt_image_data, 1024 * 1024 * 4, 4);
+
+	sp_compute_command_list compute_command_list_terrain_virtual_texture = sp_compute_command_list_create("terrain_virtual_texture", {});
+
+	sp_texture_handle terrain_virtual_texture = sp_texture_create("terrain_virtual_texture", { 1024 * 8, 1024 * 8, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
+
+	sp_descriptor_handle texture_descriptors_per_draw_terrain_virtual_texture_uav[] = {
+		detail::sp_texture_pool_get(terrain_virtual_texture)._unordered_access_view,
+	};
+	sp_descriptor_table descriptor_table_terrain_virtual_texture_per_draw_uav = sp_descriptor_table_create(sp_descriptor_table_type::uav, texture_descriptors_per_draw_terrain_virtual_texture_uav);
+
+	sp_descriptor_handle texture_descriptors_per_draw_terrain_virtual_texture_srv[] = {
+		detail::sp_texture_pool_get(terrain_dirt_texture)._shader_resource_view,
+		detail::sp_texture_pool_get(terrain_grass_texture)._shader_resource_view,
+		detail::sp_texture_pool_get(terrain_rock_texture)._shader_resource_view,
+	};
+	sp_descriptor_table descriptor_table_terrain_virtual_texture_per_draw_srv = sp_descriptor_table_create(sp_descriptor_table_type::srv, texture_descriptors_per_draw_terrain_virtual_texture_srv);
+
 	__declspec(align(16)) struct constant_buffer_per_draw_terrain_data
 	{
 		math::mat<4> world_matrix;
 	};
 
-	int cube_vertices_size_in_bytes = 0;
-	int cube_vertices_stride_in_bytes = 0;
-	const void* vertex_data_cube = sp_vertex_data_get_plane(&cube_vertices_size_in_bytes, &cube_vertices_stride_in_bytes);
-	sp_vertex_buffer_handle vertex_bufffer_terrain = sp_vertex_buffer_create("terrain", { cube_vertices_size_in_bytes, cube_vertices_stride_in_bytes });
-	sp_vertex_buffer_update(vertex_bufffer_terrain, vertex_data_cube, cube_vertices_size_in_bytes);
+	int terrain_vertices_size_in_bytes = 0;
+	int terrain_vertices_stride_in_bytes = 0;
+	const void* vertex_data_terrain = sp_vertex_data_get_plane(&terrain_vertices_size_in_bytes, &terrain_vertices_stride_in_bytes);
+	sp_vertex_buffer_handle vertex_bufffer_terrain = sp_vertex_buffer_create("terrain", { terrain_vertices_size_in_bytes, terrain_vertices_stride_in_bytes });
+	sp_vertex_buffer_update(vertex_bufffer_terrain, vertex_data_terrain, terrain_vertices_size_in_bytes);
 
 	sp_constant_buffer constant_buffer_per_draw_terrain = sp_constant_buffer_create(sizeof(constant_buffer_per_draw_terrain_data));
 
@@ -328,6 +354,11 @@ int main()
 		constant_buffer_per_draw_terrain._constant_buffer_view
 	};
 	sp_descriptor_table descriptor_table_terrain_per_draw_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_per_draw_terrain_cbv);
+
+	sp_descriptor_handle texture_descriptors_per_draw_terrain_srv[] = {
+		detail::sp_texture_pool_get(terrain_virtual_texture)._shader_resource_view,
+	};
+	sp_descriptor_table descriptor_table_terrain_per_draw_srv = sp_descriptor_table_create(sp_descriptor_table_type::srv, texture_descriptors_per_draw_terrain_srv);
 
 	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
 
@@ -355,6 +386,26 @@ int main()
 		}
 
 		{
+			// terrain virtual texture
+			{
+				sp_compute_command_list_begin(compute_command_list_terrain_virtual_texture);
+
+				sp_compute_command_list_debug_event_begin(compute_command_list_terrain_virtual_texture, "terrain_virtual_texture");
+
+				sp_compute_command_list_set_pipeline_state(compute_command_list_terrain_virtual_texture, terrain_virtual_texture_pipeline_state);
+
+				sp_compute_command_list_set_descriptor_table(compute_command_list_terrain_virtual_texture, 0, descriptor_table_terrain_virtual_texture_per_draw_srv);
+				sp_compute_command_list_set_descriptor_table(compute_command_list_terrain_virtual_texture, 2, descriptor_table_terrain_virtual_texture_per_draw_uav);
+
+				sp_compute_command_list_dispatch(compute_command_list_terrain_virtual_texture, 1024, 1024, 1);
+
+				sp_compute_command_list_debug_event_end(compute_command_list_terrain_virtual_texture);
+
+				sp_compute_command_list_end(compute_command_list_terrain_virtual_texture);
+
+				sp_compute_queue_execute(compute_command_list_terrain_virtual_texture);
+			}
+
 			sp_graphics_command_list_begin(graphics_command_list);
 
 			sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, descriptor_table_per_frame_cbv);
@@ -368,9 +419,9 @@ int main()
 				sp_graphics_command_list_clear_render_target(graphics_command_list, detail::_sp._back_buffer_texture_handles[detail::_sp._back_buffer_index]);
 			}
 
-			// terrain
+			// terrain mesh
 			{
-				graphics_command_list._command_list_d3d12->BeginEvent(1, "terrain", 8);
+				sp_graphics_command_list_debug_event_begin(graphics_command_list, "terrain");
 
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, terrain_pipeline_state);
 
@@ -387,12 +438,13 @@ int main()
 
 				sp_constant_buffer_update(constant_buffer_per_draw_terrain, &per_draw_data);
 
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, descriptor_table_terrain_per_draw_srv);
 				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 3, descriptor_table_terrain_per_draw_cbv);
 
 				sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_terrain, 1);
-				sp_graphics_command_list_draw_instanced(graphics_command_list, cube_vertices_size_in_bytes / cube_vertices_stride_in_bytes, 1);
+				sp_graphics_command_list_draw_instanced(graphics_command_list, terrain_vertices_size_in_bytes / terrain_vertices_stride_in_bytes, 1);
 
-				graphics_command_list._command_list_d3d12->EndEvent();
+				sp_graphics_command_list_debug_event_end(graphics_command_list);
 			}
 
 			{

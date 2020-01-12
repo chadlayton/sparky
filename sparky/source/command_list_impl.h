@@ -252,6 +252,16 @@ void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& com
 	command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(root_parameter_index, table._descriptor._handle_gpu_d3d12);
 }
 
+void sp_graphics_command_list_debug_event_begin(sp_graphics_command_list& command_list, const char* name)
+{
+	command_list._command_list_d3d12->BeginEvent(1, name, static_cast<UINT>(strlen(name)));
+}
+
+void sp_graphics_command_list_debug_event_end(sp_graphics_command_list& command_list)
+{
+	command_list._command_list_d3d12->EndEvent();
+}
+
 void sp_graphics_command_list_end(sp_graphics_command_list& command_list)
 {
 	detail::sp_graphics_command_list_restore_default_resource_states(command_list);
@@ -329,6 +339,21 @@ void sp_compute_command_list_begin(sp_compute_command_list& command_list)
 void sp_compute_command_list_set_pipeline_state(sp_compute_command_list& command_list, const sp_compute_pipeline_state_handle& pipeline_state_handle)
 {
 	command_list._command_list_d3d12->SetPipelineState(detail::sp_compute_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
+}
+
+void sp_compute_command_list_set_descriptor_table(sp_compute_command_list& command_list, int root_parameter_index, const sp_descriptor_table& table)
+{
+	command_list._command_list_d3d12->SetComputeRootDescriptorTable(root_parameter_index, table._descriptor._handle_gpu_d3d12);
+}
+
+void sp_compute_command_list_debug_event_begin(sp_compute_command_list& command_list, const char* name)
+{
+	command_list._command_list_d3d12->BeginEvent(1, name, static_cast<UINT>(strlen(name)));
+}
+
+void sp_compute_command_list_debug_event_end(sp_compute_command_list& command_list)
+{
+	command_list._command_list_d3d12->EndEvent();
 }
 
 void sp_compute_command_list_dispatch(sp_compute_command_list& command_list, int thread_group_count_x, int thread_group_count_y, int thread_group_count_z)

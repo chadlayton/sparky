@@ -5,10 +5,62 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{5acf72cd-ceb6-48e0-b5f4-aebaf3d66fda}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\main.cpp">
       <Filter>source</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\brdf.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\clouds.cbuffer.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\fullscreen_triangle.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\gamma_correction.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\intersect.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\lighting.cbuffer.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\noise.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\per_frame_cbuffer.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\position_from_depth.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\tonemap.hlsli">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\generate_mipmaps.hlsl">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="shaders\clouds.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\gbuffer.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\lighting.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders\low_freq_noise.hlsl">
+      <Filter>shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

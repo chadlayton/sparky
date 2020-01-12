@@ -76,11 +76,16 @@ void sp_graphics_command_list_clear_stencil(sp_graphics_command_list& command_li
 void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_list, int vertex_count, int instance_count);
 void sp_graphics_command_list_set_pipeline_state(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle);
 void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int root_parameter_index, const sp_descriptor_table& table);
+void sp_graphics_command_list_debug_event_begin(sp_graphics_command_list& command_listconst, const char* name);
+void sp_graphics_command_list_debug_event_end(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_end(sp_graphics_command_list& command_list);
 void sp_graphics_command_list_destroy(sp_graphics_command_list& command_list);
 
 sp_compute_command_list sp_compute_command_list_create(const char* name, const sp_compute_command_list_desc& desc);
 void sp_compute_command_list_begin(sp_compute_command_list& command_list);
 void sp_compute_command_list_set_pipeline_state(sp_compute_command_list& command_list, const sp_compute_pipeline_state_handle& pipeline_state_handle);
+void sp_compute_command_list_set_descriptor_table(sp_compute_command_list& command_list, int root_parameter_index, const sp_descriptor_table& table);
+void sp_compute_command_list_debug_event_begin(sp_compute_command_list& command_list, const char* name);
+void sp_compute_command_list_debug_event_end(sp_compute_command_list& command_list);
 void sp_compute_command_list_dispatch(sp_compute_command_list& command_list, int thread_group_count_x, int thread_group_count_y, int thread_group_count_z);
 void sp_compute_command_list_end(sp_compute_command_list& command_list);
