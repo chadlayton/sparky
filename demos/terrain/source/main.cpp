@@ -315,11 +315,11 @@ int main()
 
 	const void* terrain_grass_image_data = sp_image_create_from_file("textures/grass.png");
 	sp_texture_handle terrain_grass_texture = sp_texture_create("grass", { 1024, 1024, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
-	sp_texture_update(terrain_grass_texture, terrain_dirt_image_data, 1024 * 1024 * 4, 4);
+	sp_texture_update(terrain_grass_texture, terrain_grass_image_data, 1024 * 1024 * 4, 4);
 
 	const void* terrain_rock_image_data = sp_image_create_from_file("textures/rock.png");
 	sp_texture_handle terrain_rock_texture = sp_texture_create("rock", { 1024, 1024, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
-	sp_texture_update(terrain_rock_texture, terrain_dirt_image_data, 1024 * 1024 * 4, 4);
+	sp_texture_update(terrain_rock_texture, terrain_rock_image_data, 1024 * 1024 * 4, 4);
 
 	sp_compute_command_list compute_command_list_terrain_virtual_texture = sp_compute_command_list_create("terrain_virtual_texture", {});
 

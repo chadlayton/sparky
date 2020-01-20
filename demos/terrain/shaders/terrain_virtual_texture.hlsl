@@ -1,4 +1,6 @@
-Texture2D input_textures[4] : register(t0);
+#include "../../pbr/shaders/noise.hlsli"
+
+Texture2D input_textures[3] : register(t0);
 RWTexture2D<float4> output_texture : register(u0);
 SamplerState linear_clamp : register(s0);
 
@@ -10,9 +12,12 @@ void cs_main(uint3 thread_id : SV_DispatchThreadID)
 
 	float2 texcoord = thread_id.xy / float2(width, height);
 
-	float4 color = 0.33 * input_textures[0].SampleLevel(linear_clamp, texcoord, 0);
-	color += 0.33 * input_textures[1].SampleLevel(linear_clamp, texcoord, 0);
-	color += 0.33 * input_textures[2].SampleLevel(linear_clamp, texcoord, 0);
+	float3 color = input_textures[0].SampleLevel(linear_clamp, texcoord, 0).rgb;
 
-	output_texture[thread_id.xy] = color;
+	for (int i = 1; i < 3; ++i)
+	{
+		color = lerp(color, input_textures[i].SampleLevel(linear_clamp, texcoord, 0).rgb, snoise(texcoord));
+	}
+
+	output_texture[thread_id.xy] = float4(color, 1.0);
 }
