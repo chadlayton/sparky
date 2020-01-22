@@ -12,11 +12,17 @@ void cs_main(uint3 thread_id : SV_DispatchThreadID)
 
 	float2 texcoord = thread_id.xy / float2(width, height);
 
-	float3 color = input_textures[0].SampleLevel(linear_clamp, texcoord, 0).rgb;
+	float layers[] = {
+		1.0f,
+		snoise(texcoord * 0.1) * 0.5 + 0.5,
+		snoise(texcoord * 0.5) * 0.5 + 0.5
+	};
 
-	for (int i = 1; i < 3; ++i)
+	float3 color = float3(0.0f, 0.0f, 0.0f);
+
+	for (int i = 0; i < 3; ++i)
 	{
-		color = lerp(color, input_textures[i].SampleLevel(linear_clamp, texcoord, 0).rgb, snoise(texcoord));
+		color = lerp(color, input_textures[i].SampleLevel(linear_clamp, texcoord, 0).rgb, layers[i]);
 	}
 
 	output_texture[thread_id.xy] = float4(color, 1.0);

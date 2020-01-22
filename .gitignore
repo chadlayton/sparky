@@ -271,3 +271,4 @@ imgui.ini
 
 # RenderDoc
 renderdoc.dll
+renderdoc.dll.*

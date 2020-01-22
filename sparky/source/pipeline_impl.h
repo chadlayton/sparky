@@ -137,11 +137,22 @@ namespace detail
 		pipeline_state_desc_d3d12.NumRenderTargets = render_target_count;
 		pipeline_state_desc_d3d12.SampleDesc.Count = 1;
 
-		HRESULT hr = _sp._device->CreateGraphicsPipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state->_impl));
+		HRESULT hr = _sp._device->CreateGraphicsPipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state->_pipeline_d3d12));
 		assert(SUCCEEDED(hr));
 
+		switch (desc.primitive_topology)
+		{
+		case sp_primitive_topology::point_list:     pipeline_state->_primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;                 break;
+		case sp_primitive_topology::line_list:      pipeline_state->_primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_LINELIST;                  break;
+		case sp_primitive_topology::line_strip:     pipeline_state->_primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;                 break;
+		case sp_primitive_topology::triange_list:   pipeline_state->_primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;              break;
+		case sp_primitive_topology::triangle_strip: pipeline_state->_primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;             break;
+		case sp_primitive_topology::patch:          pipeline_state->_primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST; break;
+		default: assert(false);
+	}
+
 #if SP_DEBUG_RESOURCE_NAMING_ENABLED
-		pipeline_state->_impl->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+		pipeline_state->_pipeline_d3d12->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
 #endif
 
 		pipeline_state->_name = name;
@@ -186,7 +197,7 @@ void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle&
 	sp_graphics_pipeline_state& pipeline_state = detail::resource_pools::graphics_pipelines[pipeline_state_handle.index];
 
 	pipeline_state._name = nullptr;
-	pipeline_state._impl.Reset();
+	pipeline_state._pipeline_d3d12.Reset();
 
 	sp_handle_free(&detail::resource_pools::graphics_pipeline_handles, pipeline_state_handle);
 }

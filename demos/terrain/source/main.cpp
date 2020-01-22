@@ -1,6 +1,6 @@
 #define SP_HEADER_ONLY 1
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
-#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
+#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 0
 #define SP_DEBUG_API_VALIDATION_LEVEL 0
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 #define SP_DEBUG_LIVE_SHADER_RELOADING 1
@@ -429,8 +429,6 @@ int main()
 					detail::_sp._back_buffer_texture_handles[detail::_sp._back_buffer_index]
 				};
 				sp_graphics_command_list_set_render_targets(graphics_command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
-
-				graphics_command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				constant_buffer_per_draw_terrain_data per_draw_data{
 					math::create_identity<4>()

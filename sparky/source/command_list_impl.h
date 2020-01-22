@@ -34,7 +34,7 @@ sp_graphics_command_list sp_graphics_command_list_create(const char* name, const
 	ID3D12PipelineState* pipeline_state_d3d12 = nullptr;
 	if (desc.pipeline_state_handle)
 	{
-		pipeline_state_d3d12 = detail::sp_graphics_pipeline_state_pool_get(desc.pipeline_state_handle)._impl.Get();
+		pipeline_state_d3d12 = detail::sp_graphics_pipeline_state_pool_get(desc.pipeline_state_handle)._pipeline_d3d12.Get();
 	}
 
 	hr = detail::_sp._device->CreateCommandList(
@@ -244,7 +244,10 @@ void sp_graphics_command_list_draw_instanced(sp_graphics_command_list& command_l
 
 void sp_graphics_command_list_set_pipeline_state(sp_graphics_command_list& command_list, const sp_graphics_pipeline_state_handle& pipeline_state_handle)
 {
-	command_list._command_list_d3d12->SetPipelineState(detail::sp_graphics_pipeline_state_pool_get(pipeline_state_handle)._impl.Get());
+	const sp_graphics_pipeline_state& pipeline_state = detail::sp_graphics_pipeline_state_pool_get(pipeline_state_handle);
+
+	command_list._command_list_d3d12->SetPipelineState(pipeline_state._pipeline_d3d12.Get());
+	command_list._command_list_d3d12->IASetPrimitiveTopology(pipeline_state._primtive_topology_d3d);
 }
 
 void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& command_list, int root_parameter_index, const sp_descriptor_table& table)

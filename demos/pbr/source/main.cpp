@@ -1040,8 +1040,6 @@ int main()
 				sp_graphics_command_list_clear_render_target(graphics_command_list, gbuffer_normals_texture_handle);
 				sp_graphics_command_list_clear_depth(graphics_command_list, gbuffer_depth_texture_handle);
 
-				graphics_command_list._command_list_d3d12->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
 				for (auto& entity : entities)
 				{
 					constant_buffer_per_object_data per_object_data{

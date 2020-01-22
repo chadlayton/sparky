@@ -29,6 +29,16 @@ enum class sp_rasterizer_fill_mode
 	wireframe
 };
 
+enum class sp_primitive_topology
+{
+	point_list,
+	line_list,
+	line_strip,
+	triange_list,
+	triangle_strip,
+	patch,
+};
+
 struct sp_graphics_pipeline_state_desc
 {
 	sp_vertex_shader_handle vertex_shader_handle;
@@ -38,6 +48,7 @@ struct sp_graphics_pipeline_state_desc
 	sp_texture_format depth_stencil_format = sp_texture_format::unknown;
 	sp_rasterizer_cull_face cull_face = sp_rasterizer_cull_face::back;
 	sp_rasterizer_fill_mode fill_mode = sp_rasterizer_fill_mode::solid;
+	sp_primitive_topology primitive_topology = sp_primitive_topology::triange_list;
 };
 
 struct sp_compute_pipeline_state_desc
@@ -49,7 +60,9 @@ struct sp_graphics_pipeline_state
 {
 	const char* _name;
 	sp_graphics_pipeline_state_desc _desc;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
+
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipeline_d3d12;
+	D3D_PRIMITIVE_TOPOLOGY _primtive_topology_d3d;
 };
 
 struct sp_compute_pipeline_state
