@@ -255,12 +255,19 @@ void sp_graphics_command_list_set_descriptor_table(sp_graphics_command_list& com
 	command_list._command_list_d3d12->SetGraphicsRootDescriptorTable(root_parameter_index, table._descriptor._handle_gpu_d3d12);
 }
 
-void sp_graphics_command_list_debug_event_begin(sp_graphics_command_list& command_list, const char* name)
+void sp_graphics_command_list_debug_group_push(sp_graphics_command_list& command_list, const char* format, ...)
 {
-	command_list._command_list_d3d12->BeginEvent(1, name, static_cast<UINT>(strlen(name)));
+	char buf[1024];
+
+	va_list args;
+	va_start(args, format);
+	const UINT size = vsprintf_s(buf, format, args);
+	va_end(args);
+
+	command_list._command_list_d3d12->BeginEvent(1, format, size + 1);
 }
 
-void sp_graphics_command_list_debug_event_end(sp_graphics_command_list& command_list)
+void sp_graphics_command_list_debug_group_pop(sp_graphics_command_list& command_list)
 {
 	command_list._command_list_d3d12->EndEvent();
 }
@@ -349,12 +356,19 @@ void sp_compute_command_list_set_descriptor_table(sp_compute_command_list& comma
 	command_list._command_list_d3d12->SetComputeRootDescriptorTable(root_parameter_index, table._descriptor._handle_gpu_d3d12);
 }
 
-void sp_compute_command_list_debug_event_begin(sp_compute_command_list& command_list, const char* name)
+void sp_compute_command_list_debug_group_push(sp_compute_command_list& command_list, const char* format, ...)
 {
-	command_list._command_list_d3d12->BeginEvent(1, name, static_cast<UINT>(strlen(name)));
+	char buf[1024];
+
+	va_list args;
+	va_start(args, format);
+	const UINT size = vsprintf_s(buf, format, args);
+	va_end(args);
+
+	command_list._command_list_d3d12->BeginEvent(1, format, size + 1);
 }
 
-void sp_compute_command_list_debug_event_end(sp_compute_command_list& command_list)
+void sp_compute_command_list_debug_group_pop(sp_compute_command_list& command_list)
 {
 	command_list._command_list_d3d12->EndEvent();
 }

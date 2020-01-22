@@ -1026,7 +1026,7 @@ int main()
 
 			// gbuffer
 			{
-				graphics_command_list._command_list_d3d12->BeginEvent(1, "gbuffer", 8);
+				sp_graphics_command_list_debug_group_push(graphics_command_list, "gbuffer");
 
 				sp_texture_handle gbuffer_render_target_handles[] = {
 					gbuffer_base_color_texture_handle,
@@ -1066,7 +1066,7 @@ int main()
 					sp_graphics_command_list_draw_instanced(graphics_command_list, entity.mesh.vertex_count, 1);
 				}
 
-				graphics_command_list._command_list_d3d12->EndEvent();
+				sp_graphics_command_list_debug_group_pop(graphics_command_list);
 			}
 
 #if DEMO_CLOUDS
@@ -1105,7 +1105,7 @@ int main()
 #if !DEMO_CLOUDS
 			// lighting
 			{
-				graphics_command_list._command_list_d3d12->BeginEvent(1, "lighting", 9);
+				sp_graphics_command_list_debug_group_push(graphics_command_list, "lighting");
 
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, lighting_pipeline_state_handle);
 
@@ -1119,7 +1119,7 @@ int main()
 
 				sp_graphics_command_list_draw_instanced(graphics_command_list, 3, 1);
 
-				graphics_command_list._command_list_d3d12->EndEvent();
+				sp_graphics_command_list_debug_group_pop(graphics_command_list);
 			}
 #endif
 

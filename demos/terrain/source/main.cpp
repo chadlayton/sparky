@@ -390,7 +390,7 @@ int main()
 			{
 				sp_compute_command_list_begin(compute_command_list_terrain_virtual_texture);
 
-				sp_compute_command_list_debug_event_begin(compute_command_list_terrain_virtual_texture, "terrain_virtual_texture");
+				sp_compute_command_list_debug_group_push(compute_command_list_terrain_virtual_texture, "terrain_virtual_texture");
 
 				sp_compute_command_list_set_pipeline_state(compute_command_list_terrain_virtual_texture, terrain_virtual_texture_pipeline_state);
 
@@ -399,7 +399,7 @@ int main()
 
 				sp_compute_command_list_dispatch(compute_command_list_terrain_virtual_texture, 1024, 1024, 1);
 
-				sp_compute_command_list_debug_event_end(compute_command_list_terrain_virtual_texture);
+				sp_compute_command_list_debug_group_pop(compute_command_list_terrain_virtual_texture);
 
 				sp_compute_command_list_end(compute_command_list_terrain_virtual_texture);
 
@@ -421,7 +421,7 @@ int main()
 
 			// terrain mesh
 			{
-				sp_graphics_command_list_debug_event_begin(graphics_command_list, "terrain");
+				sp_graphics_command_list_debug_group_push(graphics_command_list, "terrain");
 
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, terrain_pipeline_state);
 
@@ -442,7 +442,7 @@ int main()
 				sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_terrain, 1);
 				sp_graphics_command_list_draw_instanced(graphics_command_list, terrain_vertices_size_in_bytes / terrain_vertices_stride_in_bytes, 1);
 
-				sp_graphics_command_list_debug_event_end(graphics_command_list);
+				sp_graphics_command_list_debug_group_pop(graphics_command_list);
 			}
 
 			{
