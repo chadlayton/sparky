@@ -1,6 +1,6 @@
 #define SP_HEADER_ONLY 1
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
-#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 0
+#define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
 #define SP_DEBUG_API_VALIDATION_LEVEL 0
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 #define SP_DEBUG_LIVE_SHADER_RELOADING 1
@@ -9,6 +9,8 @@
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
 #include <sparky/sparky.h>
+
+#include <thread>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -289,6 +291,26 @@ int main()
 		sp_compute_shader_create({ "shaders/terrain_virtual_texture.hlsl" })
 	});
 
+	sp_graphics_pipeline_state_handle water_pipeline_state = sp_graphics_pipeline_state_create("water", {
+		sp_vertex_shader_create({ "shaders/water.hlsl" }),
+		sp_pixel_shader_create({ "shaders/water.hlsl" }),
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT },
+		},
+		{
+			sp_texture_format::r10g10b10a2,
+		},
+		sp_texture_format::d32,
+		sp_rasterizer_cull_face::back,
+		sp_rasterizer_fill_mode::solid,
+	});
+
+	sp_texture_handle depth_texture_handle = sp_texture_create("depth", 
+		{ 
+			window_width, 
+			window_height, 1, 
+			sp_texture_format::d32 });
+
 	__declspec(align(16)) struct
 	{
 		math::mat<4> view_matrix;
@@ -298,7 +320,7 @@ int main()
 		math::mat<4> inverse_projection_matrix;
 		math::mat<4> inverse_view_projection_matrix;
 		math::vec<3> camera_position_ws;
-		float dummy = 0;
+		float time_ms;
 
 	} constant_buffer_per_frame_data;
 
@@ -309,6 +331,9 @@ int main()
 	};
 	sp_descriptor_table descriptor_table_per_frame_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_per_frame_cbv);
 
+	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
+
+	// Terrain
 	const void* terrain_dirt_image_data = sp_image_create_from_file("textures/dirt.png");
 	sp_texture_handle terrain_dirt_texture = sp_texture_create("dirt", { 1024, 1024, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
 	sp_texture_update(terrain_dirt_texture, terrain_dirt_image_data, 1024 * 1024 * 4, 4);
@@ -360,7 +385,35 @@ int main()
 	};
 	sp_descriptor_table descriptor_table_terrain_per_draw_srv = sp_descriptor_table_create(sp_descriptor_table_type::srv, texture_descriptors_per_draw_terrain_srv);
 
-	sp_graphics_command_list graphics_command_list = sp_graphics_command_list_create("graphics_command_list", {});
+	// Water
+	const void* water_test_image_data = sp_image_create_from_file("textures/test_uv.png");
+	sp_texture_handle water_test_texture = sp_texture_create("test", { 512, 512, 1, sp_texture_format::r8g8b8a8, sp_texture_flags::none });
+	sp_texture_update(water_test_texture, water_test_image_data, 512 * 512 * 4, 4);
+
+	__declspec(align(16)) struct constant_buffer_per_draw_water_data
+	{
+		math::mat<4> world_matrix;
+	};
+
+	int water_vertices_size_in_bytes = 0;
+	int water_vertices_stride_in_bytes = 0;
+	const void* vertex_data_water = sp_vertex_data_get_plane(&water_vertices_size_in_bytes, &water_vertices_stride_in_bytes);
+	sp_vertex_buffer_handle vertex_bufffer_water = sp_vertex_buffer_create("water", { water_vertices_size_in_bytes, water_vertices_stride_in_bytes });
+	sp_vertex_buffer_update(vertex_bufffer_water, vertex_data_water, water_vertices_size_in_bytes);
+
+	sp_constant_buffer constant_buffer_per_draw_water = sp_constant_buffer_create(sizeof(constant_buffer_per_draw_water_data));
+
+	sp_descriptor_handle constant_buffer_descriptors_per_draw_water_cbv[] = {
+		constant_buffer_per_draw_water._constant_buffer_view
+	};
+	sp_descriptor_table descriptor_table_water_per_draw_cbv = sp_descriptor_table_create(sp_descriptor_table_type::cbv, constant_buffer_descriptors_per_draw_water_cbv);
+
+	sp_descriptor_handle texture_descriptors_per_draw_water_srv[] = {
+		detail::sp_texture_pool_get(water_test_texture)._shader_resource_view,
+	};
+	sp_descriptor_table descriptor_table_water_per_draw_srv = sp_descriptor_table_create(sp_descriptor_table_type::srv, texture_descriptors_per_draw_water_srv);
+
+	auto start_time = std::chrono::high_resolution_clock::now();
 
 	while (sp_window_poll())
 	{
@@ -371,7 +424,7 @@ int main()
 		{
 			const math::mat<4> camera_transform = camera_get_transform(camera);
 			const math::mat<4> view_matrix = math::inverse(camera_transform);
-			const math::mat<4> projection_matrix = math::create_perspective_fov_rh(math::pi / 3, aspect_ratio, 0.1f, 10000.0f);
+			const math::mat<4> projection_matrix = math::create_perspective_fov_rh(math::pi / 3, aspect_ratio, 0.1f, 1000.0f);
 			const math::mat<4> view_projection_matrix = math::multiply(view_matrix, projection_matrix);
 
 			constant_buffer_per_frame_data.view_matrix = view_matrix;
@@ -381,6 +434,7 @@ int main()
 			constant_buffer_per_frame_data.inverse_projection_matrix = math::inverse(projection_matrix);
 			constant_buffer_per_frame_data.inverse_view_projection_matrix = math::inverse(view_projection_matrix);
 			constant_buffer_per_frame_data.camera_position_ws = camera.position;
+			constant_buffer_per_frame_data.time_ms = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(std::chrono::high_resolution_clock::now() - start_time).count();
 
 			sp_constant_buffer_update(constant_buffer_per_frame, &constant_buffer_per_frame_data);
 		}
@@ -408,8 +462,6 @@ int main()
 
 			sp_graphics_command_list_begin(graphics_command_list);
 
-			sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, descriptor_table_per_frame_cbv);
-
 			{
 				int width, height;
 				sp_window_get_size(window, &width, &height);
@@ -417,30 +469,54 @@ int main()
 				sp_graphics_command_list_set_scissor_rect(graphics_command_list, { 0, 0, width, height });
 
 				sp_graphics_command_list_clear_render_target(graphics_command_list, detail::_sp._back_buffer_texture_handles[detail::_sp._back_buffer_index]);
-			}
+				sp_graphics_command_list_clear_depth(graphics_command_list, depth_texture_handle);
 
-			// terrain mesh
-			{
-				sp_graphics_command_list_debug_group_push(graphics_command_list, "terrain");
-
-				sp_graphics_command_list_set_pipeline_state(graphics_command_list, terrain_pipeline_state);
-
-				sp_texture_handle lighting_render_target_handles[] = {
+				sp_texture_handle render_target_handles[] = {
 					detail::_sp._back_buffer_texture_handles[detail::_sp._back_buffer_index]
 				};
-				sp_graphics_command_list_set_render_targets(graphics_command_list, lighting_render_target_handles, static_cast<int>(std::size(lighting_render_target_handles)), {});
+				sp_graphics_command_list_set_render_targets(graphics_command_list, render_target_handles, static_cast<int>(std::size(render_target_handles)), depth_texture_handle);
 
-				constant_buffer_per_draw_terrain_data per_draw_data{
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, descriptor_table_per_frame_cbv);
+			}
+
+			//// terrain mesh
+			//{
+			//	sp_graphics_command_list_debug_group_push(graphics_command_list, "terrain");
+
+			//	sp_graphics_command_list_set_pipeline_state(graphics_command_list, terrain_pipeline_state);
+
+			//	constant_buffer_per_draw_terrain_data per_draw_data{
+			//		math::create_identity<4>()
+			//	};
+
+			//	sp_constant_buffer_update(constant_buffer_per_draw_terrain, &per_draw_data);
+
+			//	sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, descriptor_table_terrain_per_draw_srv);
+			//	sp_graphics_command_list_set_descriptor_table(graphics_command_list, 3, descriptor_table_terrain_per_draw_cbv);
+
+			//	sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_terrain, 1);
+			//	sp_graphics_command_list_draw_instanced(graphics_command_list, terrain_vertices_size_in_bytes / terrain_vertices_stride_in_bytes, 1);
+
+			//	sp_graphics_command_list_debug_group_pop(graphics_command_list);
+			//}
+
+			// water mesh
+			{
+				sp_graphics_command_list_debug_group_push(graphics_command_list, "water");
+
+				sp_graphics_command_list_set_pipeline_state(graphics_command_list, water_pipeline_state);
+
+				constant_buffer_per_draw_water_data per_draw_data{
 					math::create_identity<4>()
 				};
 
-				sp_constant_buffer_update(constant_buffer_per_draw_terrain, &per_draw_data);
+				sp_constant_buffer_update(constant_buffer_per_draw_water, &per_draw_data);
 
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, descriptor_table_terrain_per_draw_srv);
-				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 3, descriptor_table_terrain_per_draw_cbv);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, descriptor_table_water_per_draw_srv);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 3, descriptor_table_water_per_draw_cbv);
 
-				sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_terrain, 1);
-				sp_graphics_command_list_draw_instanced(graphics_command_list, terrain_vertices_size_in_bytes / terrain_vertices_stride_in_bytes, 1);
+				sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_water, 1);
+				sp_graphics_command_list_draw_instanced(graphics_command_list, water_vertices_size_in_bytes / water_vertices_stride_in_bytes, 1);
 
 				sp_graphics_command_list_debug_group_pop(graphics_command_list);
 			}
@@ -470,6 +546,8 @@ int main()
 		sp_graphics_queue_execute(graphics_command_list);
 
 		sp_swap_chain_present();
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
 		input_update(&input);
 
