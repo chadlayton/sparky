@@ -19,7 +19,7 @@ namespace detail
 {
 	struct sp_directory_watch
 	{
-		std::array<uint8_t, sizeof(FILE_NOTIFY_INFORMATION) + MAX_PATH * sizeof(WCHAR)> buffer = {};
+		std::array<uint8_t, (sizeof(FILE_NOTIFY_INFORMATION) + MAX_PATH * sizeof(WCHAR)) * 10> buffer = {};
 		HANDLE file_handle;
 		HANDLE completion_handle;
 		std::map<std::string, std::vector<std::function<void(const char*)>>> file_watch_callbacks;
@@ -107,10 +107,10 @@ void sp_file_watch_tick()
 		{
 			std::string filename = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(notification->FileName, notification->FileName + notification->FileNameLength / sizeof(WCHAR));
 
-			sp_log("file change detected [%d]: %s", notification->Action, filename.c_str());
-
 			if (dir.second.file_watch_callbacks.count(filename))
 			{
+				sp_log("file change detected [%d]: %s", notification->Action, filename.c_str());
+
 				std::filesystem::path file_watch_path = std::filesystem::path(dir.first) / std::filesystem::path(filename);
 				std::string filepath = file_watch_path.string();
 
