@@ -1,4 +1,4 @@
-#include "../../pbr/shaders/noise.hlsli"
+#include "../../../sparky/shaders/sparky/noise.hlsli"
 
 Texture2D terrain_virtual_texture : register(t0);
 SamplerState linear_clamp : register(s0);

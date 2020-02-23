@@ -1,4 +1,4 @@
-#include "../../pbr/shaders/noise.hlsli"
+#include "../../../sparky/shaders/sparky/noise.hlsli"
 
 #define PI 3.1415927
 

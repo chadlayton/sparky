@@ -1,5 +1,7 @@
 #pragma once
 
+#include "log.h"
+
 #include <vector>
 #include <codecvt>
 #include <functional>
@@ -10,6 +12,8 @@
 
 #define NOMINMAX
 #include <windows.h>
+
+#define SP_FILE_WATCH_NOTIFY_FILTER FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_SECURITY
 
 namespace detail
 {
@@ -57,7 +61,7 @@ void sp_file_watch_create(const char* filepath, std::function<void(const char*)>
 			directory_watch.buffer.data(),
 			static_cast<DWORD>(directory_watch.buffer.size()),
 			FALSE,
-			FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_CREATION,
+			SP_FILE_WATCH_NOTIFY_FILTER,
 			nullptr,
 			&directory_watch.overlapped,
 			nullptr);
@@ -103,7 +107,7 @@ void sp_file_watch_tick()
 		{
 			std::string filename = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(notification->FileName, notification->FileName + notification->FileNameLength / sizeof(WCHAR));
 
-			std::cout << "file change detected [" << notification->Action << "]: " << filename << std::endl;
+			sp_log("file change detected [%d]: %s", notification->Action, filename.c_str());
 
 			if (dir.second.file_watch_callbacks.count(filename))
 			{
@@ -129,7 +133,7 @@ void sp_file_watch_tick()
 			dir.second.buffer.data(),
 			static_cast<DWORD>(dir.second.buffer.size()),
 			FALSE,
-			FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_CREATION,
+			SP_FILE_WATCH_NOTIFY_FILTER,
 			nullptr,
 			&dir.second.overlapped,
 			nullptr);

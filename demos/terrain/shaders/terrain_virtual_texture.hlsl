@@ -1,4 +1,4 @@
-#include "../../pbr/shaders/noise.hlsli"
+#include "../../../sparky/shaders/sparky/noise.hlsli"
 
 Texture2D input_textures[3] : register(t0);
 RWTexture2D<float4> output_texture : register(u0);

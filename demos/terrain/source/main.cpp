@@ -479,26 +479,26 @@ int main()
 				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 1, descriptor_table_per_frame_cbv);
 			}
 
-			//// terrain mesh
-			//{
-			//	sp_graphics_command_list_debug_group_push(graphics_command_list, "terrain");
+			// terrain mesh
+			{
+				sp_graphics_command_list_debug_group_push(graphics_command_list, "terrain");
 
-			//	sp_graphics_command_list_set_pipeline_state(graphics_command_list, terrain_pipeline_state);
+				sp_graphics_command_list_set_pipeline_state(graphics_command_list, terrain_pipeline_state);
 
-			//	constant_buffer_per_draw_terrain_data per_draw_data{
-			//		math::create_identity<4>()
-			//	};
+				constant_buffer_per_draw_terrain_data per_draw_data{
+					math::create_identity<4>()
+				};
 
-			//	sp_constant_buffer_update(constant_buffer_per_draw_terrain, &per_draw_data);
+				sp_constant_buffer_update(constant_buffer_per_draw_terrain, &per_draw_data);
 
-			//	sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, descriptor_table_terrain_per_draw_srv);
-			//	sp_graphics_command_list_set_descriptor_table(graphics_command_list, 3, descriptor_table_terrain_per_draw_cbv);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 0, descriptor_table_terrain_per_draw_srv);
+				sp_graphics_command_list_set_descriptor_table(graphics_command_list, 3, descriptor_table_terrain_per_draw_cbv);
 
-			//	sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_terrain, 1);
-			//	sp_graphics_command_list_draw_instanced(graphics_command_list, terrain_vertices_size_in_bytes / terrain_vertices_stride_in_bytes, 1);
+				sp_graphics_command_list_set_vertex_buffers(graphics_command_list, &vertex_bufffer_terrain, 1);
+				sp_graphics_command_list_draw_instanced(graphics_command_list, terrain_vertices_size_in_bytes / terrain_vertices_stride_in_bytes, 1);
 
-			//	sp_graphics_command_list_debug_group_pop(graphics_command_list);
-			//}
+				sp_graphics_command_list_debug_group_pop(graphics_command_list);
+			}
 
 			// water mesh
 			{
@@ -507,7 +507,7 @@ int main()
 				sp_graphics_command_list_set_pipeline_state(graphics_command_list, water_pipeline_state);
 
 				constant_buffer_per_draw_water_data per_draw_data{
-					math::create_identity<4>()
+					math::create_translation({ 128.0f, 0.0f, 0.0f })
 				};
 
 				sp_constant_buffer_update(constant_buffer_per_draw_water, &per_draw_data);

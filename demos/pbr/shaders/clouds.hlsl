@@ -1,7 +1,8 @@
+#include "../../../sparky/shaders/sparky/noise.hlsli"
+
 #include "per_frame_cbuffer.hlsli"
 #include "fullscreen_triangle.hlsli"
 #include "position_from_depth.hlsli"
-#include "noise.hlsli"
 #include "tonemap.hlsli"
 #include "gamma_correction.hlsli"
 #include "clouds.cbuffer.hlsli"

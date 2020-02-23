@@ -5,6 +5,7 @@
 #include "handle.h"
 #include "texture.h"
 #include "shader.h"
+#include "log.h"
 #include "d3dx12.h"
 
 #include <array>
@@ -175,6 +176,7 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 		{
 			vertex_shader = std::move(temp);
 			detail::sp_graphics_pipeline_state_init(pipeline_state._name, pipeline_state._desc, &pipeline_state);
+			sp_log("reloaded: %s", vertex_shader._desc.filepath);
 		}
 	});
 
@@ -185,6 +187,7 @@ sp_graphics_pipeline_state_handle sp_graphics_pipeline_state_create(const char* 
 		{
 			pixel_shader = std::move(temp);
 			detail::sp_graphics_pipeline_state_init(pipeline_state._name, pipeline_state._desc, &pipeline_state);
+			sp_log("reloaded: %s", pixel_shader._desc.filepath);
 		}
 	});
 #endif
@@ -202,23 +205,44 @@ void sp_graphics_pipeline_state_destroy(const sp_graphics_pipeline_state_handle&
 	sp_handle_free(&detail::resource_pools::graphics_pipeline_handles, pipeline_state_handle);
 }
 
+namespace detail
+{
+	void sp_compute_pipeline_state_init(const char* name, const sp_compute_pipeline_state_desc& desc, sp_compute_pipeline_state* pipeline_state)
+	{
+		D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc_d3d12 = {};
+		pipeline_state_desc_d3d12.pRootSignature = detail::_sp._root_signature.Get();
+		pipeline_state_desc_d3d12.CS = CD3DX12_SHADER_BYTECODE(detail::sp_compute_shader_pool_get(desc.compute_shader_handle)._blob.Get());
+		HRESULT hr = detail::_sp._device->CreateComputePipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state->_impl));
+		assert(SUCCEEDED(hr));
+
+#if SP_DEBUG_RESOURCE_NAMING_ENABLED
+		pipeline_state->_impl->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+#endif
+
+		pipeline_state->_name = name;
+		pipeline_state->_desc = desc;
+	}
+}
+
 sp_compute_pipeline_state_handle sp_compute_pipeline_state_create(const char* name, const sp_compute_pipeline_state_desc& desc)
 {
 	sp_compute_pipeline_state_handle pipeline_state_handle = sp_handle_alloc(&detail::resource_pools::compute_pipeline_handles);
 	sp_compute_pipeline_state& pipeline_state = detail::resource_pools::compute_pipelines[pipeline_state_handle.index];
 
-	D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc_d3d12 = {};
-	pipeline_state_desc_d3d12.pRootSignature = detail::_sp._root_signature.Get();
-	pipeline_state_desc_d3d12.CS = CD3DX12_SHADER_BYTECODE(detail::sp_compute_shader_pool_get(desc.compute_shader_handle)._blob.Get());
-	HRESULT hr = detail::_sp._device->CreateComputePipelineState(&pipeline_state_desc_d3d12, IID_PPV_ARGS(&pipeline_state._impl));
-	assert(SUCCEEDED(hr));
+	detail::sp_compute_pipeline_state_init(name, desc, &pipeline_state);
 
-#if SP_DEBUG_RESOURCE_NAMING_ENABLED
-	pipeline_state._impl->SetName(std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(name).c_str());
+#if SP_DEBUG_LIVE_SHADER_RELOADING
+	sp_compute_shader& compute_shader = detail::sp_compute_shader_pool_get(desc.compute_shader_handle);
+	sp_file_watch_create(compute_shader._desc.filepath, [&compute_shader, &pipeline_state](const char*) {
+		sp_compute_shader temp;
+		if (detail::sp_compute_shader_init(compute_shader._desc, &temp))
+		{
+			compute_shader = std::move(temp);
+			detail::sp_compute_pipeline_state_init(pipeline_state._name, pipeline_state._desc, &pipeline_state);
+			sp_log("reloaded: %s", compute_shader._desc.filepath);
+		}
+	});
 #endif
-
-	pipeline_state._name = name;
-	pipeline_state._desc = desc;
 
 	return pipeline_state_handle;
 }

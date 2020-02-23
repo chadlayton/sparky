@@ -36,6 +36,7 @@ struct sp_pixel_shader
 
 struct sp_compute_shader
 {
+	sp_compute_shader_desc _desc;
 	Microsoft::WRL::ComPtr<ID3DBlob> _blob;
 };
 
@@ -59,6 +60,7 @@ namespace detail
 
 	bool sp_vertex_shader_init(const sp_vertex_shader_desc& desc, sp_vertex_shader* shader);
 	bool sp_pixel_shader_init(const sp_pixel_shader_desc& desc, sp_pixel_shader* shader);
+	bool sp_compute_shader_init(const sp_compute_shader_desc& desc, sp_compute_shader* shader);
 }
 
 sp_vertex_shader_handle sp_vertex_shader_create(const sp_vertex_shader_desc& desc);

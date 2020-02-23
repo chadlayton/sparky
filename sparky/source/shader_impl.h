@@ -3,6 +3,7 @@
 #include "shader.h"
 #include "handle.h"
 #include "file_watch.h"
+#include "log.h"
 #include "d3dx12.h"
 
 #include <codecvt>
@@ -52,6 +53,7 @@ namespace detail
 	{
 		std::unordered_map<const char*, sp_pixel_shader_handle> pixel_shader_cache;
 		std::unordered_map<const char*, sp_vertex_shader_handle> vertex_shader_cache;
+		std::unordered_map<const char*, sp_compute_shader_handle> compute_shader_cache;
 	}
 
 	void sp_vertex_shader_pool_create()
@@ -121,7 +123,7 @@ namespace detail
 
 		if (error_blob)
 		{
-			OutputDebugStringA(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+			sp_log(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
 			error_blob->Release();
 		}
 
@@ -191,7 +193,7 @@ namespace detail
 
 		if (error_blob)
 		{
-			OutputDebugStringA(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+			sp_log(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
 			error_blob->Release();
 		}
 
@@ -243,36 +245,57 @@ sp_pixel_shader_handle sp_pixel_shader_create(const sp_pixel_shader_desc& desc)
 	return shader_handle;
 }
 
+namespace detail
+{
+	bool sp_compute_shader_init(const sp_compute_shader_desc& desc, sp_compute_shader* shader)
+	{
+		UINT compile_flags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR; // XXX: Would be nice for performance if matrices were row major alread
+
+#if defined(_DEBUG)
+		compile_flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
+#endif
+
+		ID3DBlob* error_blob = nullptr;
+		HRESULT hr = D3DCompileFromFile(
+			std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc.filepath).c_str(),
+			nullptr,
+			D3D_COMPILE_STANDARD_FILE_INCLUDE,
+			"cs_main",
+			"cs_5_1",
+			compile_flags,
+			0,
+			&shader->_blob,
+			&error_blob);
+
+		if (error_blob)
+		{
+			sp_log(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+			error_blob->Release();
+		}
+
+		shader->_desc = desc;
+
+		return SUCCEEDED(hr);
+	}
+}
+
 sp_compute_shader_handle sp_compute_shader_create(const sp_compute_shader_desc& desc)
 {
+	// TODO: Should hash the desc instead of relying on filepath alone...
+	if (detail::cache::compute_shader_cache.count(desc.filepath))
+	{
+		return detail::cache::compute_shader_cache[desc.filepath];
+	}
+
 	sp_compute_shader_handle shader_handle = sp_handle_alloc(&detail::resource_pools::compute_shader_handles);
 	sp_compute_shader& shader = detail::resource_pools::compute_shaders[shader_handle.index];
 
-	UINT compile_flags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR; // XXX: Would be nice for performance if matrices were row major alread
-
-#if defined(_DEBUG)
-	compile_flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
-#endif
-
-	ID3DBlob* error_blob = nullptr;
-	HRESULT hr = D3DCompileFromFile(
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(desc.filepath).c_str(),
-		nullptr,
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		"cs_main",
-		"cs_5_1",
-		compile_flags,
-		0,
-		&shader._blob,
-		&error_blob);
-
-	if (error_blob)
+	if (!detail::sp_compute_shader_init(desc, &shader))
 	{
-		OutputDebugStringA(reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
-		error_blob->Release();
+		assert(false);
 	}
 
-	assert(SUCCEEDED(hr));
+	detail::cache::compute_shader_cache[desc.filepath] = shader_handle;
 
 	return shader_handle;
 }
