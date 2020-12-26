@@ -4,7 +4,7 @@
 
 void sp_log(const char* format, ...)
 {
-	char buf[512];
+	char buf[8192];
 
 	va_list args;
 	va_start(args, format);

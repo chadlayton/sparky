@@ -124,7 +124,7 @@ void sp_graphics_command_list_set_vertex_buffers(sp_graphics_command_list& comma
 	command_list._command_list_d3d12->IASetVertexBuffers(0, vertex_buffer_count, vertex_buffer_views);
 }
 
-void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& command_list, sp_texture_handle* render_target_handles, int render_target_count, sp_texture_handle depth_stencil_handle)
+void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& command_list, const sp_texture_handle* render_target_handles, int render_target_count, sp_texture_handle depth_stencil_handle)
 {
 	detail::sp_graphics_command_list_restore_default_resource_states(command_list);
 

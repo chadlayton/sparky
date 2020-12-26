@@ -15,13 +15,13 @@ constexpr int sp_texture_mip_level_max = 16;
 
 enum class sp_texture_format
 {
+	unknown,
 	r8g8b8a8,
 	r10g10b10a2,
 	r16g16b16a16,
 	r32g32b32a32,
 	d16,
 	d32,
-	unknown,
 };
 
 enum class sp_texture_flags

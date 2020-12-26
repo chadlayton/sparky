@@ -1,7 +1,7 @@
 #define SP_HEADER_ONLY 1
 #define SP_DEBUG_RESOURCE_NAMING_ENABLED 1 
 #define SP_DEBUG_RENDERDOC_HOOK_ENABLED 1
-#define SP_DEBUG_API_VALIDATION_LEVEL 0
+#define SP_DEBUG_API_VALIDATION_LEVEL 1
 #define SP_DEBUG_SHUTDOWN_LEAK_REPORT_ENABLED 0
 #define SP_DEBUG_LIVE_SHADER_RELOADING 1
 
@@ -733,7 +733,6 @@ int main()
 	sp_vertex_shader_handle gbuffer_vertex_shader_handle = sp_vertex_shader_create({ "shaders/gbuffer.hlsl" });
 	sp_pixel_shader_handle gbuffer_pixel_shader_handle = sp_pixel_shader_create({ "shaders/gbuffer.hlsl" });
 
-	// TODO: The pipeline state should be part of the material. Not sure how we'll make the association though.
 	sp_graphics_pipeline_state_handle gbuffer_single_sided_pipeline_state_handle = sp_graphics_pipeline_state_create("gbuffer_single_sided", {
 		gbuffer_vertex_shader_handle,
 		gbuffer_pixel_shader_handle,

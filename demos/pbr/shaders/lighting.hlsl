@@ -238,10 +238,9 @@ float4 ps_main(ps_input input) : SV_Target0
 			uint width, height, levels;
 			environment_specular_texture.GetDimensions(0, width, height, levels);
 
-			// TODO: Lots of fireflies. Try sampling the light source and then maybe MIS?
-			uint mip = 0;
+			float lod = 1.5 - (((1.0 + 24.0 * disney_roughness) - 1.0) / 4.0) * (levels - 1);
 
-			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, mip).rgb * inverse_pdf * inverse_sample_count;
+			float3 radiance = environment_specular_texture.SampleLevel(default_sampler, texcoord, 0).rgb * inverse_pdf * inverse_sample_count;
 
 			const float3 f_s = specular(specular_color, n_dot_v, n_dot_l, n_dot_h, l_dot_h, disney_roughness);
 

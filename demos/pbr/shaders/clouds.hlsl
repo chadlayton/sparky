@@ -64,7 +64,7 @@ float sample_cloud_density(float3 sample_position_ws)
 
 	const float cloud_shape_sample_scale_base = 0.0002f;
 	const float cloud_shape_sample_scale = (cloud_shape_sample_scale_base * (1 - shape_sample_scale_bias));
-	const float4 cloud_shape = cloud_shape_texture.Sample(default_sampler, sample_position_ws * cloud_shape_sample_scale);
+	const float4 cloud_shape = cloud_shape_texture.SampleLevel(default_sampler, sample_position_ws * cloud_shape_sample_scale, 0);
 
 	float density = cloud_shape.r;
 
@@ -75,7 +75,7 @@ float sample_cloud_density(float3 sample_position_ws)
 	const float cloud_type = saturate(cloud_type_base + type_bias);
 	density = apply_cloud_type(density, height_signal, cloud_type);
 
-	float4 cloud_weather_data = cloud_weather_texture.Sample(default_sampler, sample_position_ws.xz * 0.00002 * (1 - weather_sample_scale_bias));
+	float4 cloud_weather_data = cloud_weather_texture.SampleLevel(default_sampler, sample_position_ws.xz * 0.00002 * (1 - weather_sample_scale_bias), 0);
 
 	const float coverage_base = cloud_weather_data.r;
 	const float coverage = saturate(coverage_base + coverage_bias);
