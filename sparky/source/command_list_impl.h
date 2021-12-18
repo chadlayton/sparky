@@ -4,6 +4,8 @@
 #include "vertex_buffer.h"
 #include "pipeline.h"
 
+#include "d3dx12.h"
+
 #include <codecvt>
 
 sp_graphics_command_list sp_graphics_command_list_create(const char* name, const sp_graphics_command_list_desc& desc)
@@ -179,12 +181,14 @@ void sp_graphics_command_list_set_render_targets(sp_graphics_command_list& comma
 
 void sp_graphics_command_list_set_viewport(sp_graphics_command_list& command_list, const sp_viewport& viewport)
 {
-	command_list._command_list_d3d12->RSSetViewports(1, &CD3DX12_VIEWPORT(viewport.x, viewport.y, viewport.width, viewport.height, viewport.depth_min, viewport.depth_max));
+	auto viewport_d3dx12 = CD3DX12_VIEWPORT(viewport.x, viewport.y, viewport.width, viewport.height, viewport.depth_min, viewport.depth_max);
+	command_list._command_list_d3d12->RSSetViewports(1, &viewport_d3dx12);
 }
 
 void sp_graphics_command_list_set_scissor_rect(sp_graphics_command_list& command_list, const sp_scissor_rect& scissor)
 {
-	command_list._command_list_d3d12->RSSetScissorRects(1, &CD3DX12_RECT(scissor.x, scissor.y, scissor.x + scissor.width, scissor.y + scissor.height));
+	auto rect_d3dx12 = CD3DX12_RECT(scissor.x, scissor.y, scissor.x + scissor.width, scissor.y + scissor.height);
+	command_list._command_list_d3d12->RSSetScissorRects(1, &rect_d3dx12);
 }
 
 void sp_graphics_command_list_clear_render_target(sp_graphics_command_list& command_list, sp_texture_handle render_target_handle)

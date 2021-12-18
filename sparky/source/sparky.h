@@ -20,7 +20,7 @@ namespace detail
 	{
 		Microsoft::WRL::ComPtr<ID3D12Device> _device;
 		Microsoft::WRL::ComPtr<IDXGISwapChain3> _swap_chain;
-		int _back_buffer_index;
+		int _back_buffer_index = 0;
 
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _graphics_queue;
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> _compute_queue;

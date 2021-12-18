@@ -34,11 +34,11 @@ struct sp_graphics_command_list
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _command_allocator_d3d12[k_back_buffer_count];
 
 	Microsoft::WRL::ComPtr<ID3D12Fence> _fences[k_back_buffer_count];
-	HANDLE _fence_events[k_back_buffer_count];
-	UINT64 _fence_values[k_back_buffer_count];
+	HANDLE _fence_events[k_back_buffer_count] = { 0 };
+	UINT64 _fence_values[k_back_buffer_count] = { 0 };
 	UINT64 _next_fence_value = 0;
 
-	int _back_buffer_index;
+	int _back_buffer_index = 0;
 
 	D3D12_RESOURCE_BARRIER _resource_transition_records[64];
 	int _resource_transition_records_count = 0;

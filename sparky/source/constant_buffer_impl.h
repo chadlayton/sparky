@@ -22,10 +22,12 @@ namespace detail
 		// A constant buffer is expected to be 256 byte aligned so the heap should as well
 		const int size_in_bytes_aligned = (desc.size_in_bytes + 255) & ~255;
 
+		const auto heap_properties_d3dx12 = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		const auto resource_desc_d3dx12 = CD3DX12_RESOURCE_DESC::Buffer(size_in_bytes_aligned);
 		HRESULT hr = detail::_sp._device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			&heap_properties_d3dx12,
 			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(size_in_bytes_aligned),
+			&resource_desc_d3dx12,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&constant_buffer_heap._resource));

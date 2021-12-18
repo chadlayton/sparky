@@ -2,6 +2,7 @@
 
 #include "constant_buffer.h"
 #include "vertex_buffer.h"
+
 #include "d3dx12.h"
 
 #include <array>
@@ -41,10 +42,13 @@ sp_vertex_buffer_handle sp_vertex_buffer_create(const char* name, const sp_verte
 	// recommended. Every time the GPU needs it, the upload heap will be marshalled 
 	// over. Please read up on Default Heap usage. An upload heap is used here for 
 	// code simplicity.
+
+	const D3D12_HEAP_PROPERTIES heap_properties_d3d12 = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	const D3D12_RESOURCE_DESC resource_desc_d3d12 = CD3DX12_RESOURCE_DESC::Buffer(desc._size_in_bytes);
 	hr = detail::_sp._device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heap_properties_d3d12,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(desc._size_in_bytes),
+		&resource_desc_d3d12,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&buffer._resource));

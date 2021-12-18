@@ -1,5 +1,7 @@
 #pragma once
 
+#include "d3dx12.h"
+
 #include <array>
 #include <codecvt>
 
@@ -181,8 +183,9 @@ sp_texture_handle sp_texture_create(const char* name, const sp_texture_desc& des
 		resource_desc_d3d12.MipLevels = 1;
 	}
 
+	const auto heap_properties_d3dx12 = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	HRESULT hr = detail::_sp._device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		&heap_properties_d3dx12,
 		D3D12_HEAP_FLAG_NONE,
 		&resource_desc_d3d12,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -278,19 +281,24 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 	// Create the GPU upload buffer.
 	UINT64 upload_buffer_size_bytes = 0;
 
-	ID3D12Device* device = nullptr;
-	texture._resource->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
-	device->GetCopyableFootprints(&texture._resource->GetDesc(), 0, 1, 0, nullptr, nullptr, nullptr, &upload_buffer_size_bytes);
-	device->Release();
+	{
+		ID3D12Device* device = nullptr;
+		texture._resource->GetDevice(__uuidof(*device), reinterpret_cast<void**>(&device));
+		const auto resource_desc_d3d12 = texture._resource->GetDesc();
+		device->GetCopyableFootprints(&resource_desc_d3d12, 0, 1, 0, nullptr, nullptr, nullptr, &upload_buffer_size_bytes);
+		device->Release();
+	}
 
 	// assert(size_bytes == upload_buffer_size_bytes);
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> texture_upload_buffer;
 
+	const auto heap_properties_d3dx12 = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	const auto resource_desc_d3dx12 = CD3DX12_RESOURCE_DESC::Buffer(upload_buffer_size_bytes);
 	HRESULT hr = detail::_sp._device->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		&heap_properties_d3dx12,
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(upload_buffer_size_bytes),
+		&resource_desc_d3dx12,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&texture_upload_buffer));
@@ -314,7 +322,8 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 
 	sp_graphics_command_list_begin(texture_update_command_list);
 
-	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), texture._default_state, D3D12_RESOURCE_STATE_COPY_DEST));
+	auto barrier_d3dx12 = CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), texture._default_state, D3D12_RESOURCE_STATE_COPY_DEST);
+	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &barrier_d3dx12);
 
 	UpdateSubresources(texture_update_command_list._command_list_d3d12.Get(),
 		texture._resource.Get(),
@@ -324,7 +333,8 @@ void sp_texture_update(const sp_texture_handle& texture_handle, const void* data
 		1,
 		&subresource_data);
 
-	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, texture._default_state));
+	barrier_d3dx12 = CD3DX12_RESOURCE_BARRIER::Transition(texture._resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, texture._default_state);
+	texture_update_command_list._command_list_d3d12->ResourceBarrier(1, &barrier_d3dx12);
 
 	sp_graphics_command_list_end(texture_update_command_list);
 

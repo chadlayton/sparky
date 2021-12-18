@@ -16,8 +16,8 @@ namespace detail
 	{
 		const char* _name;
 		Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
-		int _size_in_bytes;
-		int _head;
+		int _size_in_bytes = 0;
+		int _head = 0;
 	};
 }
 

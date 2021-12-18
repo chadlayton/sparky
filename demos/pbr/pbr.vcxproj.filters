@@ -48,19 +48,9 @@
     <None Include="shaders\generate_mipmaps.hlsl">
       <Filter>shaders</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="shaders\clouds.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\gbuffer.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\lighting.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="shaders\low_freq_noise.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
+    <None Include="shaders\clouds.hlsl" />
+    <None Include="shaders\gbuffer.hlsl" />
+    <None Include="shaders\lighting.hlsl" />
+    <None Include="shaders\low_freq_noise.hlsl" />
   </ItemGroup>
 </Project>

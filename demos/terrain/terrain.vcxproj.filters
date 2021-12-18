@@ -15,8 +15,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shaders\terrain.hlsl">
-      <Filter>shaders</Filter>
-    </FxCompile>
+    <None Include="shaders\terrain.hlsl" />
   </ItemGroup>
 </Project>

@@ -9,8 +9,8 @@ static constexpr int SP_DESCRIPTOR_TABLE_SIZE_IN_DESCRIPTORS_MAX = 32;
 
 struct sp_descriptor_handle
 {
-	D3D12_CPU_DESCRIPTOR_HANDLE _handle_cpu_d3d12;
-	D3D12_GPU_DESCRIPTOR_HANDLE _handle_gpu_d3d12;
+	D3D12_CPU_DESCRIPTOR_HANDLE _handle_cpu_d3d12 = { 0 };
+	D3D12_GPU_DESCRIPTOR_HANDLE _handle_gpu_d3d12 = { 0 };
 };
 
 enum class sp_descriptor_table_type
@@ -48,9 +48,9 @@ namespace detail
 	{
 		const char* _name;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heap_d3d12;
-		int _descriptor_capacity;
-		int _descriptor_count;
-		int _descriptor_size;
+		int _descriptor_capacity = 0;
+		int _descriptor_count = 0;
+		int _descriptor_size = 0;
 		sp_descriptor_handle _base;
 		sp_descriptor_handle _head;
 	};
