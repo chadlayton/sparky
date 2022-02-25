@@ -46,21 +46,27 @@ struct sp_graphics_command_list
 
 struct sp_compute_command_list
 {
-	const char* _name;
+	const char* _name = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> _command_list_d3d12;
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _command_allocator_d3d12;
 };
 
 struct sp_viewport
 {
-	float x, y, width, height;
+	float x = 0.0f;
+	float y = 0.0f;
+	float width = 0.0f;
+	float height = 0.0f;
 	float depth_min = 0.0f;
 	float depth_max = 1.0f;
 };
 
 struct sp_scissor_rect
 {
-	int x, y, width, height;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
 };
 
 sp_graphics_command_list sp_graphics_command_list_create(const char* name, const sp_graphics_command_list_desc& desc);

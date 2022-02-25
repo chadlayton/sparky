@@ -11,9 +11,9 @@
 
 struct sp_input_element_desc
 {
-	const char* _semantic_name;
-	unsigned _semantic_index;
-	DXGI_FORMAT _format;
+	const char* _semantic_name = nullptr;
+	unsigned _semantic_index = 0;
+	DXGI_FORMAT _format = DXGI_FORMAT_UNKNOWN;
 };
 
 enum class sp_rasterizer_cull_face
@@ -44,7 +44,7 @@ struct sp_graphics_pipeline_state_desc
 	sp_vertex_shader_handle vertex_shader_handle;
 	sp_pixel_shader_handle pixel_shader_handle;
 	sp_input_element_desc input_layout[D3D12_STANDARD_VERTEX_ELEMENT_COUNT];
-	sp_texture_format render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
+	sp_texture_format render_target_formats[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = { sp_texture_format::unknown };
 	sp_texture_format depth_stencil_format = sp_texture_format::unknown;
 	sp_rasterizer_cull_face cull_face = sp_rasterizer_cull_face::back;
 	sp_rasterizer_fill_mode fill_mode = sp_rasterizer_fill_mode::solid;
@@ -58,16 +58,16 @@ struct sp_compute_pipeline_state_desc
 
 struct sp_graphics_pipeline_state
 {
-	const char* _name;
+	const char* _name = nullptr;
 	sp_graphics_pipeline_state_desc _desc;
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipeline_d3d12;
-	D3D_PRIMITIVE_TOPOLOGY _primtive_topology_d3d;
+	D3D_PRIMITIVE_TOPOLOGY _primtive_topology_d3d = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 };
 
 struct sp_compute_pipeline_state
 {
-	const char* _name;
+	const char* _name = nullptr;
 	sp_compute_pipeline_state_desc _desc;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> _impl;
 };

@@ -50,22 +50,22 @@ inline sp_texture_flags operator & (sp_texture_flags lhs, sp_texture_flags rhs)
 
 struct sp_texture_desc
 {
-	int width;
-	int height;
-	int depth;
+	int width = 0;
+	int height = 0;
+	int depth = 0;
 	sp_texture_format format;
 	sp_texture_flags flags;
 };
 
 struct sp_texture
 {
-	const char* _name;
-	int _width;
-	int _height;
-	int _depth;
+	const char* _name = nullptr;
+	int _width = 0;
+	int _height = 0;
+	int _depth = 1;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
-	int _num_mip_levels;
-	sp_texture_format _format;
+	int _num_mip_levels = 1;
+	sp_texture_format _format = sp_texture_format::unknown;
 
 	sp_descriptor_handle _render_target_view;
 	sp_descriptor_handle _shader_resource_view;

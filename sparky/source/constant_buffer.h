@@ -14,7 +14,7 @@ namespace detail
 
 	struct sp_constant_buffer_heap
 	{
-		const char* _name;
+		const char* _name = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
 		int _size_in_bytes = 0;
 		int _head = 0;

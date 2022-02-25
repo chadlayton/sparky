@@ -9,17 +9,17 @@
 
 struct sp_vertex_shader_desc
 {
-	const char* filepath;
+	const char* filepath = nullptr;
 };
 
 struct sp_pixel_shader_desc
 {
-	const char* filepath;
+	const char* filepath = nullptr;
 };
 
 struct sp_compute_shader_desc
 {
-	const char* filepath;
+	const char* filepath = nullptr;
 };
 
 struct sp_vertex_shader

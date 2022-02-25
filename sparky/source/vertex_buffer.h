@@ -15,7 +15,7 @@ struct sp_vertex_buffer_desc
 
 struct sp_vertex_buffer
 {
-	const char* _name;
+	const char* _name = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _resource;
 	D3D12_VERTEX_BUFFER_VIEW _vertex_buffer_view;
 };

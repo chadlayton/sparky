@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cassert>
+#include <cstdio>
+
 void* sp_image_create_from_file(const char* filename)
 {
 	int image_width, image_height, image_channels;

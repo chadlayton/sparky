@@ -46,7 +46,7 @@ namespace detail
 
 	struct sp_descriptor_heap
 	{
-		const char* _name;
+		const char* _name = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _heap_d3d12;
 		int _descriptor_capacity = 0;
 		int _descriptor_count = 0;

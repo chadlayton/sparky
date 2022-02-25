@@ -109,11 +109,11 @@ void camera_update(camera* camera, const input& input)
 
 struct model
 {
-	char name[128];
+	char name[128] = { '\0' };
 
 	struct material
 	{
-		char name[128];
+		char name[128] = { '\0' };
 		int base_color_texture_index = -1;
 		int metalness_roughness_texture_index = -1;
 		std::array<float, 4> base_color_factor = { 1.0f, 1.0f, 1.0f, 1.0f };
